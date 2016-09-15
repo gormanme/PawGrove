@@ -7,6 +7,7 @@
 IDXGISwapChain *swapChain = {};				//Pointer to swap chain interface
 ID3D11Device *device = {};					//Pointer to Direct3D device interface
 ID3D11DeviceContext *deviceContext = {};	//Pointer to Direct3D device context
+ID3D11RenderTargetView *backBuffer = {};	//Pointer to the back buffer
 
 //Function declarations:
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -15,7 +16,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow);
 
 void InitD3D(HWND hWnd);			//Sets up and initializes Direct3D
-void CleanD3D();				//Closes Direct3D and releases memory
+void RenderFrame();					//Renders a single frame
+void CleanD3D();					//Closes Direct3D and releases memory
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
@@ -84,10 +86,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 				break;
 			}
 		}
-		else
-		{
-			//Run game code here:
-		}
+		
+		//Render the frame:
+		RenderFrame();
 
 	}
 
@@ -137,14 +138,50 @@ void InitD3D(HWND hWnd)
 	//Create a device, device context, and swap chain using the information in the swapChainDesc struct
 	D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, NULL, NULL, NULL, D3D11_SDK_VERSION,
 		&swapChainDesc, &swapChain, &device, NULL, &deviceContext);
+
+	//Get the address of the back buffer
+	ID3D11Texture2D *pBackBuffer = {};
+	swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
+
+	//Use the back buffer address to create the render target
+	device->CreateRenderTargetView(pBackBuffer, NULL, &backBuffer);
+	pBackBuffer->Release();
+
+	//Set the render target as the back buffer
+	deviceContext->OMSetRenderTargets(1, &backBuffer, NULL);
+
+	//Set the viewport
+	D3D11_VIEWPORT viewPort = {};
+
+	viewPort.TopLeftX = 0;
+	viewPort.TopLeftY = 0;
+	viewPort.Width = 800;
+	viewPort.Height = 600;
+
+	deviceContext->RSSetViewports(1, &viewPort);
 }
 
+
+//Renders a single frame
+void RenderFrame()
+{
+	float color[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
+
+	//Clear the back buffer to a deep blue
+	deviceContext->ClearRenderTargetView(backBuffer, color);
+
+	//Do 3D rendering on the back buffer here
+
+	//Switch the back buffer and the front buffer to present to screen
+	swapChain->Present(0, 0);
+}
 
 //Cleans up Direct3D
 void CleanD3D()
 {
 	//Close and release all existing COM objects
 	swapChain->Release();
+	backBuffer->Release();
 	device->Release();
 	deviceContext->Release();
 }
