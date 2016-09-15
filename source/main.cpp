@@ -53,16 +53,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     ShowWindow(hWnd, nCmdShow);
 
     //Main loop:
-    //Wait for the next message in the queue, store the result in 'msg'
-    while (GetMessage(&msg, NULL, 0, 0))
-    {
-        //Translate keystroke messages into the right format
-        TranslateMessage(&msg);
+    //Check to see if any messages are waiting in the queue
+	while (TRUE)
+	{
+		if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+		{
 
-        //Send the message to the WindowProc function
-        DispatchMessage(&msg);
-    }
+			//Translate keystroke messages into the right format
+			TranslateMessage(&msg);
 
+			//Send the message to the WindowProc function
+			DispatchMessage(&msg);
+
+			//Check to see if it's time to quit
+			if (msg.message == WM_QUIT)
+			{
+				break;
+			}
+		}
+		else
+		{
+			//Run game code here:
+		}
+
+	}
     //Return this part of the WM_QUIT message to Windows
     return (int) msg.wParam;
 }
