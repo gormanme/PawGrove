@@ -1,4 +1,12 @@
 #include <windows.h>
+#include <d3d11.h>
+
+#pragma comment (lib, "d3d11.lib")
+
+//Global declarations
+IDXGISwapChain *swapChain = {};				//Pointer to swap chain interface
+ID3D11Device *device = {};					//Pointer to Direct3D device interface
+ID3D11DeviceContext *deviceContext = {};	//Pointer to Direct3D device context
 
 //Function declarations:
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -6,6 +14,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 // the entry point for any Windows program
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow);
 
+void InitD3D(HWND hWnd);			//Sets up and initializes Direct3D
+void CleanD3D();				//Closes Direct3D and releases memory
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
@@ -19,7 +29,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     //Windows event messages struct
     MSG msg = {};
 
-    //Fill in the dinwo class with needed information
+    //Fill in the window class with needed information
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = WindowProc;
@@ -52,6 +62,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     //Display the window on the screen
     ShowWindow(hWnd, nCmdShow);
 
+	//Sets up and initialize Direct3D
+	InitD3D(hWnd);
+
     //Main loop:
     //Check to see if any messages are waiting in the queue
 	while (TRUE)
@@ -77,6 +90,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 		}
 
 	}
+
+	//Clean up DirectX
+	CleanD3D();
+
     //Return this part of the WM_QUIT message to Windows
     return (int) msg.wParam;
 }
@@ -100,4 +117,34 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
     //Handle any messages the switch statement didn't
     return DefWindowProc(hWnd, message, wParam, lParam);
+}
+
+
+//Initialize and prepare Direct3D for use
+void InitD3D(HWND hWnd)
+{
+	//Create a struct to hold information abuot the swap chain
+	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
+
+	//Fill in teh swap chain description struct
+	swapChainDesc.BufferCount = 1;									//One back buffer
+	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;	//Use 32-bit color
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;	//How swap chain is to be used
+	swapChainDesc.OutputWindow = hWnd;								//The window to be used
+	swapChainDesc.SampleDesc.Count = 4;								//How many multisamples
+	swapChainDesc.Windowed = true;									//Windowed/full-screen mode
+
+	//Create a device, device context, and swap chain using the information in the swapChainDesc struct
+	D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, NULL, NULL, NULL, D3D11_SDK_VERSION,
+		&swapChainDesc, &swapChain, &device, NULL, &deviceContext);
+}
+
+
+//Cleans up Direct3D
+void CleanD3D()
+{
+	//Close and release all existing COM objects
+	swapChain->Release();
+	device->Release();
+	deviceContext->Release();
 }
