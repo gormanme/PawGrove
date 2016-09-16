@@ -198,7 +198,7 @@ void RenderFrame()
     deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     //Draw the vertex buffer to the back buffer
-    deviceContext->Draw(3, 0);
+    deviceContext->Draw(6, 0);
 
     //Switch the back buffer and the front buffer to present to screen
     swapChain->Present(0, 0);
@@ -222,17 +222,27 @@ void CleanD3D()
 void InitGraphics()
 {
     //Create a triangle using the VERTEX struct
-    VERTEX OurVertices[] =
-    {
-        { 0.0f, 0.5f, 0.0f, {1.0f, 0.0f, 0.0f, 1.0f} },
-        { 0.45f, -0.5, 0.0f, {0.0f, 1.0f, 0.0f, 1.0f} },
-        { -0.45f, -0.5f, 0.0f, {0.0f, 0.0f, 1.0f, 1.0f} }
-    };
+    //VERTEX OurVertices[] =
+    //{
+    //    { 0.0f, 0.5f, 0.0f, {1.0f, 0.0f, 0.0f, 1.0f} },
+    //    { 0.45f, -0.5, 0.0f, {0.0f, 1.0f, 0.0f, 1.0f} },
+    //    { -0.45f, -0.5f, 0.0f, {0.0f, 0.0f, 1.0f, 1.0f} }
+    //};
+
+	VERTEX OurVertices[] =
+	{
+		{ 0.45f, 0.5, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ 0.45f, -0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ -0.45f, 0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ -0.45f, 0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ 0.45f, -0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ -0.45f, -0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+	};
 
     //Create the vertex buffer
     D3D11_BUFFER_DESC bufferDesc = {};
     bufferDesc.Usage = D3D11_USAGE_DYNAMIC;				//Write access by CPU and GPU
-    bufferDesc.ByteWidth = sizeof(VERTEX) * 3;			//Size is the VERTEX struct * 3
+    bufferDesc.ByteWidth = sizeof(VERTEX) * 6;			//Size is the VERTEX struct * 3
     bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;	//Use as a vertex buffer
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//Allow CPU to write in buffer
 
