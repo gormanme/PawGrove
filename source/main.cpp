@@ -14,6 +14,7 @@ ID3D11InputLayout *pLayout = {};			//Pointer to the input layout
 ID3D11VertexShader *pVS = {};				//Pointer to vertex shader
 ID3D11PixelShader *pPS = {};				//Pointer to pixel shader
 ID3D11Buffer *pVBuffer = {};				//Pointer to vertex buffer
+ID3D11Buffer *pIBuffer = {};				//Pointer to index buffer
 
 int winWidth = 800;
 int winHeight = 600;
@@ -194,11 +195,14 @@ void RenderFrame()
     UINT offset = 0;
     deviceContext->IASetVertexBuffers(0, 1, &pVBuffer, &stride, &offset);
 
+	//Set index buffer
+	deviceContext->IASetIndexBuffer(pIBuffer, DXGI_FORMAT_R16_UINT, 0);
+
     //Select which primitive type we are using
     deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     //Draw the vertex buffer to the back buffer
-    deviceContext->Draw(6, 0);
+    deviceContext->DrawIndexed(36, 0, 0);
 
     //Switch the back buffer and the front buffer to present to screen
     swapChain->Present(0, 0);
@@ -212,6 +216,7 @@ void CleanD3D()
     pVS->Release();
     pPS->Release();
     pVBuffer->Release();
+	pIBuffer->Release();
     swapChain->Release();
     backBuffer->Release();
     device->Release();
@@ -231,28 +236,60 @@ void InitGraphics()
 
 	VERTEX OurVertices[] =
 	{
-		{ 0.45f, 0.5, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ 0.45f, -0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ -0.45f, 0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ -0.45f, 0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ 0.45f, -0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ -0.45f, -0.5f, 0.0f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ 0.5f, 0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ -0.5f, -0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ 0.5f, -0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ -0.5f, 0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ 0.5f, 0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ -0.5f, -0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ 0.5f, -0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+		{ -0.5f, 0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } }
 	};
 
     //Create the vertex buffer
-    D3D11_BUFFER_DESC bufferDesc = {};
-    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;				//Write access by CPU and GPU
-    bufferDesc.ByteWidth = sizeof(VERTEX) * 6;			//Size is the VERTEX struct * 3
-    bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;	//Use as a vertex buffer
-    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//Allow CPU to write in buffer
+    D3D11_BUFFER_DESC vBufferDesc = {};
+    vBufferDesc.Usage = D3D11_USAGE_DYNAMIC;				//Write access by CPU and GPU
+    vBufferDesc.ByteWidth = sizeof(VERTEX) * 8;				//Size is the VERTEX struct * number of vertices
+    vBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;		//Use as a vertex buffer
+    vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//Allow CPU to write in buffer
 
-    device->CreateBuffer(&bufferDesc, NULL, &pVBuffer);
+    device->CreateBuffer(&vBufferDesc, NULL, &pVBuffer);
 
     //Copy the vertices into the buffer
-    D3D11_MAPPED_SUBRESOURCE mappedResource = {};
-    deviceContext->Map(pVBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &mappedResource);	//map the buffer
-    memcpy(mappedResource.pData, OurVertices, sizeof(OurVertices));						//copy the data
+    D3D11_MAPPED_SUBRESOURCE vMappedResource = {};
+    deviceContext->Map(pVBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &vMappedResource);	//map the buffer
+    memcpy(vMappedResource.pData, OurVertices, sizeof(OurVertices));						//copy the data
     deviceContext->Unmap(pVBuffer, NULL);
+
+	short indices[] = 
+	{
+		0, 2, 3,    // side 1
+		2, 1, 3,
+		0, 4, 6,    // side 2
+		6, 2, 0,
+		1, 5, 6,    // side 3
+		6, 2, 1,
+		7, 3, 1,    // side 4
+		1, 5, 7,
+		7, 4, 0,    // side 5
+		0, 3, 7,
+		7, 4, 6,    // side 6
+		6, 5, 7,
+	};
+	D3D11_BUFFER_DESC iBufferDesc = {};
+	iBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+	iBufferDesc.ByteWidth = sizeof(indices);
+	iBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	iBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+	//Create index buffer
+	device->CreateBuffer(&iBufferDesc, NULL, &pIBuffer);
+
+	//Copy the indices into the buffer
+	D3D11_MAPPED_SUBRESOURCE iMappedResource = {};
+	deviceContext->Map(pIBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &iMappedResource);	//Map the buffer
+	memcpy(iMappedResource.pData, indices, sizeof(indices));								//Copy the data
+	deviceContext->Unmap(pIBuffer, NULL);
 }
 
 
