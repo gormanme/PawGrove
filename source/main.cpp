@@ -1,20 +1,25 @@
 #include <windows.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
+#include <directxmath.h>
 
 #pragma comment (lib, "d3d11.lib")
 #pragma comment (lib, "d3dcompiler.lib")
 
 //Global declarations
-IDXGISwapChain *swapChain = {};				//Pointer to swap chain interface
-ID3D11Device *device = {};					//Pointer to Direct3D device interface
-ID3D11DeviceContext *deviceContext = {};	//Pointer to Direct3D device context
-ID3D11RenderTargetView *backBuffer = {};	//Pointer to the back buffer
-ID3D11InputLayout *pLayout = {};			//Pointer to the input layout
-ID3D11VertexShader *pVS = {};				//Pointer to vertex shader
-ID3D11PixelShader *pPS = {};				//Pointer to pixel shader
-ID3D11Buffer *pVBuffer = {};				//Pointer to vertex buffer
-ID3D11Buffer *pIBuffer = {};				//Pointer to index buffer
+IDXGISwapChain *swapChain = nullptr;			//Pointer to swap chain interface
+ID3D11Device *device = nullptr;					//Pointer to Direct3D device interface
+ID3D11DeviceContext *deviceContext = nullptr;	//Pointer to Direct3D device context
+ID3D11RenderTargetView *backBuffer = nullptr;	//Pointer to the back buffer
+ID3D11InputLayout *pLayout = nullptr;			//Pointer to the input layout
+ID3D11VertexShader *pVS = nullptr;				//Pointer to vertex shader
+ID3D11PixelShader *pPS = nullptr;				//Pointer to pixel shader
+ID3D11Buffer *pVBuffer = nullptr;				//Pointer to vertex buffer
+ID3D11Buffer *pIBuffer = nullptr;				//Pointer to index buffer
+ID3D11Buffer *pConstantBuffer = nullptr;      //Pointer to constant buffer
+DirectX::XMMATRIX worldMatrix = {};
+DirectX::XMMATRIX viewMatrix = {};
+DirectX::XMMATRIX projectionMatrix = {};
 
 int winWidth = 800;
 int winHeight = 600;
@@ -25,6 +30,13 @@ struct VERTEX {
     FLOAT color[4];
 };
 
+//Constant buffer struct for shader
+struct ConstantBuffer
+{
+    DirectX::XMMATRIX mWorld;
+    DirectX::XMMATRIX mView;
+    DirectX::XMMATRIX mProjection;
+};
 
 
 //Function declarations:
@@ -40,7 +52,7 @@ void InitPipeline();				//Loads and prepares the shaders
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
 {
     //Handle for the window
-    HWND hWnd = {};
+    HWND hWnd = nullptr;
 
     //Holds information for the window class
     WNDCLASSEX wc = {};
@@ -153,7 +165,7 @@ void InitD3D(HWND hWnd)
     swapChainDesc.Windowed = true;									//Windowed/full-screen mode
 
     //Create a device, device context, and swap chain using the information in the swapChainDesc struct
-    D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, NULL, NULL, NULL, D3D11_SDK_VERSION,
+    D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, D3D11_CREATE_DEVICE_DEBUG, NULL, NULL, D3D11_SDK_VERSION,
         &swapChainDesc, &swapChain, &device, NULL, &deviceContext);
 
     //Get the address of the back buffer
@@ -195,11 +207,18 @@ void RenderFrame()
     UINT offset = 0;
     deviceContext->IASetVertexBuffers(0, 1, &pVBuffer, &stride, &offset);
 
-	//Set index buffer
-	deviceContext->IASetIndexBuffer(pIBuffer, DXGI_FORMAT_R16_UINT, 0);
+    //Set index buffer
+    deviceContext->IASetIndexBuffer(pIBuffer, DXGI_FORMAT_R16_UINT, 0);
 
     //Select which primitive type we are using
     deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    //Update variables for shader
+    ConstantBuffer cb = {};
+    cb.mWorld = DirectX::XMMatrixTranspose(worldMatrix);
+    cb.mView = DirectX::XMMatrixTranspose(viewMatrix);
+    cb.mProjection = DirectX::XMMatrixTranspose(projectionMatrix);
+    deviceContext->UpdateSubresource(pConstantBuffer, 0, nullptr, &cb, 0, 0);
 
     //Draw the vertex buffer to the back buffer
     deviceContext->DrawIndexed(36, 0, 0);
@@ -216,7 +235,8 @@ void CleanD3D()
     pVS->Release();
     pPS->Release();
     pVBuffer->Release();
-	pIBuffer->Release();
+    pIBuffer->Release();
+    pConstantBuffer->Release();
     swapChain->Release();
     backBuffer->Release();
     device->Release();
@@ -234,22 +254,22 @@ void InitGraphics()
     //    { -0.45f, -0.5f, 0.0f, {0.0f, 0.0f, 1.0f, 1.0f} }
     //};
 
-	VERTEX OurVertices[] =
-	{
-		{ 0.5f, 0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ -0.5f, -0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ 0.5f, -0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ -0.5f, 0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ 0.5f, 0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ -0.5f, -0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ 0.5f, -0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-		{ -0.5f, 0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } }
-	};
+    VERTEX OurVertices[] =
+    {
+        { 0.5f, 0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+        { -0.5f, -0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+        { 0.5f, -0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+        { -0.5f, 0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+        { 0.5f, 0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+        { -0.5f, -0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+        { 0.5f, -0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
+        { -0.5f, 0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } }
+    };
 
     //Create the vertex buffer
     D3D11_BUFFER_DESC vBufferDesc = {};
     vBufferDesc.Usage = D3D11_USAGE_DYNAMIC;				//Write access by CPU and GPU
-    vBufferDesc.ByteWidth = sizeof(VERTEX) * 8;				//Size is the VERTEX struct * number of vertices
+    vBufferDesc.ByteWidth = sizeof(OurVertices);			//Size is the VERTEX struct * number of vertices
     vBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;		//Use as a vertex buffer
     vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//Allow CPU to write in buffer
 
@@ -261,35 +281,36 @@ void InitGraphics()
     memcpy(vMappedResource.pData, OurVertices, sizeof(OurVertices));						//copy the data
     deviceContext->Unmap(pVBuffer, NULL);
 
-	short indices[] = 
-	{
-		0, 2, 3,    // side 1
-		2, 1, 3,
-		0, 4, 6,    // side 2
-		6, 2, 0,
-		1, 5, 6,    // side 3
-		6, 2, 1,
-		7, 3, 1,    // side 4
-		1, 5, 7,
-		7, 4, 0,    // side 5
-		0, 3, 7,
-		7, 4, 6,    // side 6
-		6, 5, 7,
-	};
-	D3D11_BUFFER_DESC iBufferDesc = {};
-	iBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	iBufferDesc.ByteWidth = sizeof(indices);
-	iBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-	iBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    short indices[] = 
+    {
+        0, 2, 3,    // side 1
+        2, 1, 3,
+        0, 4, 6,    // side 2
+        6, 2, 0,
+        1, 5, 6,    // side 3
+        6, 2, 1,
+        7, 3, 1,    // side 4
+        1, 5, 7,
+        7, 4, 0,    // side 5
+        0, 3, 7,
+        7, 4, 6,    // side 6
+        6, 5, 7,
+    };
+    D3D11_BUFFER_DESC iBufferDesc = {};
+    iBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    iBufferDesc.ByteWidth = sizeof(indices);
+    iBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    iBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-	//Create index buffer
-	device->CreateBuffer(&iBufferDesc, NULL, &pIBuffer);
+    //Create index buffer
+    device->CreateBuffer(&iBufferDesc, NULL, &pIBuffer);
 
-	//Copy the indices into the buffer
-	D3D11_MAPPED_SUBRESOURCE iMappedResource = {};
-	deviceContext->Map(pIBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &iMappedResource);	//Map the buffer
-	memcpy(iMappedResource.pData, indices, sizeof(indices));								//Copy the data
-	deviceContext->Unmap(pIBuffer, NULL);
+    //Copy the indices into the buffer
+    D3D11_MAPPED_SUBRESOURCE iMappedResource = {};
+    deviceContext->Map(pIBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &iMappedResource);	//Map the buffer
+    memcpy(iMappedResource.pData, indices, sizeof(indices));								//Copy the data
+    deviceContext->Unmap(pIBuffer, NULL);
+
 }
 
 
@@ -297,7 +318,8 @@ void InitGraphics()
 void InitPipeline()
 {
     //Load and compile the two shaders
-    ID3D10Blob *VS, *PS = {};
+    ID3D10Blob *VS = nullptr;
+    ID3D10Blob *PS = nullptr;
     D3DCompileFromFile(L"source/shader.hlsl", NULL, NULL, "VShader", "vs_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
         &VS, 0);
     D3DCompileFromFile(L"source/shader.hlsl", NULL, NULL, "PShader", "ps_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
@@ -307,8 +329,29 @@ void InitPipeline()
     device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), NULL, &pVS);
     device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), NULL, &pPS);
 
+    //Initialize the world matrix
+    worldMatrix = DirectX::XMMatrixIdentity();
+
+    //Create the constant buffer
+    D3D11_BUFFER_DESC cBufferDesc = {};
+    cBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    cBufferDesc.ByteWidth = sizeof(ConstantBuffer);
+    cBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    cBufferDesc.CPUAccessFlags = 0;
+    HRESULT hr = device->CreateBuffer(&cBufferDesc, nullptr, &pConstantBuffer);
+
+    //Initialize the view matrix
+    DirectX::XMVECTOR eye = DirectX::XMVectorSet(0.0f, 1.0f, -5.0f, 0.0f);
+    DirectX::XMVECTOR at = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    viewMatrix = DirectX::XMMatrixLookAtLH(eye, at, up);
+
+    //Initialize the projection matrix
+    projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2, winWidth / (float)winHeight, 0.01f, 100.0f);
+
     //Set the shader objects
     deviceContext->VSSetShader(pVS, 0, 0);
+    deviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
     deviceContext->PSSetShader(pPS, 0, 0);
 
     //Create the input layout object
