@@ -3,6 +3,8 @@
 #include <d3dcompiler.h>
 #include <directxmath.h>
 
+using namespace DirectX;
+
 #pragma comment (lib, "d3d11.lib")
 #pragma comment (lib, "d3dcompiler.lib")
 
@@ -17,25 +19,25 @@ ID3D11PixelShader *pPS = nullptr;				//Pointer to pixel shader
 ID3D11Buffer *pVBuffer = nullptr;				//Pointer to vertex buffer
 ID3D11Buffer *pIBuffer = nullptr;				//Pointer to index buffer
 ID3D11Buffer *pConstantBuffer = nullptr;      //Pointer to constant buffer
-DirectX::XMMATRIX worldMatrix = {};
-DirectX::XMMATRIX viewMatrix = {};
-DirectX::XMMATRIX projectionMatrix = {};
+XMMATRIX worldMatrix = {};
+XMMATRIX viewMatrix = {};
+XMMATRIX projectionMatrix = {};
 
 int winWidth = 800;
 int winHeight = 600;
 
 //Struct for a single vertex
 struct VERTEX {
-    FLOAT X, Y, Z;
-    FLOAT color[4];
+    XMFLOAT3 position;
+    XMFLOAT4 color;
 };
 
 //Constant buffer struct for shader
 struct ConstantBuffer
 {
-    DirectX::XMMATRIX mWorld;
-    DirectX::XMMATRIX mView;
-    DirectX::XMMATRIX mProjection;
+    XMMATRIX mWorld;
+    XMMATRIX mView;
+    XMMATRIX mProjection;
 };
 
 
@@ -197,6 +199,20 @@ void InitD3D(HWND hWnd)
 //Renders a single frame
 void RenderFrame()
 {
+
+    //Update our time for animating the cube
+    static float t = 0.0f;
+    static ULONGLONG timeStart = 0;
+    ULONGLONG timeCur = GetTickCount64();
+    if (timeStart == 0)
+    {
+        timeStart = timeCur;
+    }
+    t = (timeCur - timeStart) / 1000.0f;
+
+    //Animate the cube
+    worldMatrix = XMMatrixRotationY(t);
+
     float color[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
 
     //Clear the back buffer to a deep blue
@@ -215,9 +231,9 @@ void RenderFrame()
 
     //Update variables for shader
     ConstantBuffer cb = {};
-    cb.mWorld = DirectX::XMMatrixTranspose(worldMatrix);
-    cb.mView = DirectX::XMMatrixTranspose(viewMatrix);
-    cb.mProjection = DirectX::XMMatrixTranspose(projectionMatrix);
+    cb.mWorld = XMMatrixTranspose(worldMatrix);
+    cb.mView = XMMatrixTranspose(viewMatrix);
+    cb.mProjection = XMMatrixTranspose(projectionMatrix);
     deviceContext->UpdateSubresource(pConstantBuffer, 0, nullptr, &cb, 0, 0);
 
     //Draw the vertex buffer to the back buffer
@@ -247,29 +263,29 @@ void CleanD3D()
 void InitGraphics()
 {
     //Create a triangle using the VERTEX struct
-    //VERTEX OurVertices[] =
+    //VERTEX vertices[] =
     //{
     //    { 0.0f, 0.5f, 0.0f, {1.0f, 0.0f, 0.0f, 1.0f} },
     //    { 0.45f, -0.5, 0.0f, {0.0f, 1.0f, 0.0f, 1.0f} },
     //    { -0.45f, -0.5f, 0.0f, {0.0f, 0.0f, 1.0f, 1.0f} }
     //};
 
-    VERTEX OurVertices[] =
+    VERTEX vertices[] =
     {
-        { 0.5f, 0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-        { -0.5f, -0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-        { 0.5f, -0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-        { -0.5f, 0.5f, 0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-        { 0.5f, 0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-        { -0.5f, -0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-        { 0.5f, -0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } },
-        { -0.5f, 0.5f, -0.5f,{ 0.0f, 1.0f, 0.0f, 1.0f } }
+        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT4(0.0f, 1.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f) },
     };
 
     //Create the vertex buffer
     D3D11_BUFFER_DESC vBufferDesc = {};
     vBufferDesc.Usage = D3D11_USAGE_DYNAMIC;				//Write access by CPU and GPU
-    vBufferDesc.ByteWidth = sizeof(OurVertices);			//Size is the VERTEX struct * number of vertices
+    vBufferDesc.ByteWidth = sizeof(vertices);			//Size is the VERTEX struct * number of vertices
     vBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;		//Use as a vertex buffer
     vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//Allow CPU to write in buffer
 
@@ -278,23 +294,28 @@ void InitGraphics()
     //Copy the vertices into the buffer
     D3D11_MAPPED_SUBRESOURCE vMappedResource = {};
     deviceContext->Map(pVBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &vMappedResource);	//map the buffer
-    memcpy(vMappedResource.pData, OurVertices, sizeof(OurVertices));						//copy the data
+    memcpy(vMappedResource.pData, vertices, sizeof(vertices));						//copy the data
     deviceContext->Unmap(pVBuffer, NULL);
 
     short indices[] = 
     {
-        0, 2, 3,    // side 1
-        2, 1, 3,
-        0, 4, 6,    // side 2
-        6, 2, 0,
-        1, 5, 6,    // side 3
-        6, 2, 1,
-        7, 3, 1,    // side 4
-        1, 5, 7,
-        7, 4, 0,    // side 5
-        0, 3, 7,
-        7, 4, 6,    // side 6
-        6, 5, 7,
+        3,1,0,
+        2,1,3,
+
+        0,5,4,
+        1,5,0,
+
+        3,4,7,
+        0,4,3,
+
+        1,6,5,
+        2,6,1,
+
+        2,7,6,
+        3,7,2,
+
+        6,4,5,
+        7,4,6,
     };
     D3D11_BUFFER_DESC iBufferDesc = {};
     iBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -330,7 +351,7 @@ void InitPipeline()
     device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), NULL, &pPS);
 
     //Initialize the world matrix
-    worldMatrix = DirectX::XMMatrixIdentity();
+    worldMatrix = XMMatrixIdentity();
 
     //Create the constant buffer
     D3D11_BUFFER_DESC cBufferDesc = {};
@@ -341,13 +362,13 @@ void InitPipeline()
     HRESULT hr = device->CreateBuffer(&cBufferDesc, nullptr, &pConstantBuffer);
 
     //Initialize the view matrix
-    DirectX::XMVECTOR eye = DirectX::XMVectorSet(0.0f, 1.0f, -5.0f, 0.0f);
-    DirectX::XMVECTOR at = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-    DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-    viewMatrix = DirectX::XMMatrixLookAtLH(eye, at, up);
+    XMVECTOR eye = XMVectorSet(0.0f, 1.0f, -5.0f, 0.0f);
+    XMVECTOR at = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    viewMatrix = XMMatrixLookAtLH(eye, at, up);
 
     //Initialize the projection matrix
-    projectionMatrix = DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PIDIV2, winWidth / (float)winHeight, 0.01f, 100.0f);
+    projectionMatrix = XMMatrixPerspectiveFovLH(XM_PIDIV2, winWidth / (float)winHeight, 0.01f, 100.0f);
 
     //Set the shader objects
     deviceContext->VSSetShader(pVS, 0, 0);
