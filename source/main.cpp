@@ -2,6 +2,7 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <directxmath.h>
+#include <stdio.h>
 
 using namespace DirectX;
 
@@ -22,6 +23,7 @@ ID3D11Buffer *pConstantBuffer = nullptr;      //Pointer to constant buffer
 XMMATRIX worldMatrix = {};
 XMMATRIX viewMatrix = {};
 XMMATRIX projectionMatrix = {};
+unsigned char* targaData = nullptr;
 
 int winWidth = 800;
 int winHeight = 600;
@@ -43,6 +45,15 @@ struct ConstantBuffer
     XMFLOAT4 vOutputColor;
 };
 
+//Struct for the targa texture file
+struct TargaHeader
+{
+    unsigned char data1[12];
+    unsigned short width;
+    unsigned short height;
+    unsigned char bpp;
+    unsigned char data2;
+};
 
 //Function declarations:
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -52,6 +63,7 @@ void RenderFrame();					//Renders a single frame
 void CleanD3D();					//Closes Direct3D and releases memory
 void InitGraphics();				//Creates the shape to render
 void InitPipeline();				//Loads and prepares the shaders
+bool LoadTarga(char* filename, int& height, int& width);
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
@@ -457,4 +469,98 @@ void InitPipeline()
     assert(SUCCEEDED(hr));
 
     deviceContext->IASetInputLayout(pLayout);
+}
+
+
+bool LoadTarga(char* filename, int& height, int& width)
+{
+    int error, bpp, imageSize, index, i, j, k;
+    FILE* filePtr;
+    unsigned int count;
+    TargaHeader targaFileHeader;
+    unsigned char* targaImage;
+
+
+    // Open the targa file for reading in binary.
+    error = fopen_s(&filePtr, filename, "rb");
+    if (error != 0)
+    {
+        return false;
+    }
+
+    // Read in the file header.
+    count = (unsigned int)fread(&targaFileHeader, sizeof(TargaHeader), 1, filePtr);
+    if (count != 1)
+    {
+        return false;
+    }
+
+    // Get the important information from the header.
+    height = (int)targaFileHeader.height;
+    width = (int)targaFileHeader.width;
+    bpp = (int)targaFileHeader.bpp;
+
+    // Check that it is 32 bit and not 24 bit.
+    if (bpp != 32)
+    {
+        return false;
+    }
+
+    // Calculate the size of the 32 bit image data.
+    imageSize = width * height * 4;
+
+    // Allocate memory for the targa image data.
+    targaImage = new unsigned char[imageSize];
+    if (!targaImage)
+    {
+        return false;
+    }
+
+    // Read in the targa image data.
+    count = (unsigned int)fread(targaImage, 1, imageSize, filePtr);
+    if (count != imageSize)
+    {
+        return false;
+    }
+
+    // Close the file.
+    error = fclose(filePtr);
+    if (error != 0)
+    {
+        return false;
+    }
+
+    // Allocate memory for the targa destination data.
+    targaData = new unsigned char[imageSize];
+
+    // Initialize the index into the targa destination data array.
+    index = 0;
+
+    // Initialize the index into the targa image data.
+    k = (width * height * 4) - (width * 4);
+
+    // Now copy the targa image data into the targa destination array in the correct order since the targa format is stored upside down.
+    for (j = 0; j<height; j++)
+    {
+        for (i = 0; i<width; i++)
+        {
+            targaData[index + 0] = targaImage[k + 2];  // Red.
+            targaData[index + 1] = targaImage[k + 1];  // Green.
+            targaData[index + 2] = targaImage[k + 0];  // Blue
+            targaData[index + 3] = targaImage[k + 3];  // Alpha
+
+                                                         // Increment the indexes into the targa data.
+            k += 4;
+            index += 4;
+        }
+
+        // Set the targa image data index back to the preceding row at the beginning of the column since its reading it in upside down.
+        k -= (width * 8);
+    }
+
+    // Release the targa image data now that it was copied into the destination array.
+    delete[] targaImage;
+    targaImage = 0;
+
+    return true;
 }
