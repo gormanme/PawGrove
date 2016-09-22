@@ -158,6 +158,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 //Initialize and prepare Direct3D for use
 void InitD3D(HWND hWnd)
 {
+    HRESULT hr = S_OK;
     //Create a struct to hold information abuot the swap chain
     DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
 
@@ -178,7 +179,9 @@ void InitD3D(HWND hWnd)
     swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
 
     //Use the back buffer address to create the render target
-    device->CreateRenderTargetView(pBackBuffer, NULL, &backBuffer);
+    hr = device->CreateRenderTargetView(pBackBuffer, NULL, &backBuffer);
+    assert(SUCCEEDED(hr));
+
     pBackBuffer->Release();
 
     //Set the render target as the back buffer
@@ -280,6 +283,7 @@ void CleanD3D()
 //Creates the shape to render
 void InitGraphics()
 {
+    HRESULT hr = S_OK;
     //Create a triangle using the VERTEX struct
     //VERTEX vertices[] =
     //{
@@ -290,14 +294,14 @@ void InitGraphics()
 
     VERTEX vertices[] =
     {
-        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(-1.0f, 1.0f, -1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, -1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(-1.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(-1.0f, -1.0f, -1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, -1.0f, -1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(1.0f, -1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(-1.0f, -1.0f, 1.0f) },
     };
 
     //Create the vertex buffer
@@ -307,7 +311,8 @@ void InitGraphics()
     vBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;		//Use as a vertex buffer
     vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//Allow CPU to write in buffer
 
-    device->CreateBuffer(&vBufferDesc, NULL, &pVBuffer);
+    hr = device->CreateBuffer(&vBufferDesc, NULL, &pVBuffer);
+    assert(SUCCEEDED(hr));
 
     //Copy the vertices into the buffer
     D3D11_MAPPED_SUBRESOURCE vMappedResource = {};
@@ -342,7 +347,8 @@ void InitGraphics()
     iBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     //Create index buffer
-    device->CreateBuffer(&iBufferDesc, NULL, &pIBuffer);
+    hr = device->CreateBuffer(&iBufferDesc, NULL, &pIBuffer);
+    assert(SUCCEEDED(hr));
 
     //Copy the indices into the buffer
     D3D11_MAPPED_SUBRESOURCE iMappedResource = {};
@@ -356,30 +362,41 @@ void InitGraphics()
 //Loads and prepares the shaders
 void InitPipeline()
 {
+    HRESULT hr = S_OK;
+
     //Load and compile the two shaders
     ID3D10Blob *VS = nullptr;
     ID3D10Blob *PS = nullptr;
     ID3DBlob *pErrorBlob = nullptr;
-    HRESULT hr = 
-    D3DCompileFromFile(L"source/shader.hlsl", nullptr, nullptr, "VShader", "vs_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
+    hr = D3DCompileFromFile(L"source/shader.hlsl", nullptr, nullptr, "VShader", "vs_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
         &VS, &pErrorBlob);
+    assert(SUCCEEDED(hr));
 
-    if (FAILED(hr))
+    if (pErrorBlob)
     {
-        if (pErrorBlob)
-        {
-            OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
-            pErrorBlob->Release();
-        }
+        OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+        pErrorBlob->Release();
+        pErrorBlob->Release();
     }
-    if (pErrorBlob) pErrorBlob->Release();
 
-    D3DCompileFromFile(L"source/shader.hlsl", nullptr, nullptr, "PSSolid", "ps_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
-        &PS, 0);
+    hr = D3DCompileFromFile(L"source/shader.hlsl", nullptr, nullptr, "PShader", "ps_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
+        &PS, &pErrorBlob);
+    assert(SUCCEEDED(hr));
+
+    if (pErrorBlob)
+    {
+        OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+        pErrorBlob->Release();
+        pErrorBlob->Release();
+    }
 
     //Encapsulate both shaders into the shader objects
-    device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), NULL, &pVS);
-    device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), NULL, &pPS);
+    hr = device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), NULL, &pVS);
+    assert(SUCCEEDED(hr));
+
+    hr = device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), NULL, &pPS);
+    assert(SUCCEEDED(hr));
+
 
     //Initialize the world matrix
     worldMatrix = XMMatrixIdentity();
@@ -391,6 +408,7 @@ void InitPipeline()
     cBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     cBufferDesc.CPUAccessFlags = 0;
     hr = device->CreateBuffer(&cBufferDesc, nullptr, &pConstantBuffer);
+    assert(SUCCEEDED(hr));
 
     //Initialize the view matrix
     XMVECTOR eye = XMVectorSet(0.0f, 1.0f, -5.0f, 0.0f);
@@ -404,15 +422,18 @@ void InitPipeline()
     //Set the shader objects
     deviceContext->VSSetShader(pVS, 0, 0);
     deviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
+    deviceContext->PSSetConstantBuffers(0, 1, &pConstantBuffer);
     deviceContext->PSSetShader(pPS, 0, 0);
 
     //Create the input layout object
     D3D11_INPUT_ELEMENT_DESC elementDesc[] = 
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
     };
 
-    device->CreateInputLayout(elementDesc, 2, VS->GetBufferPointer(), VS->GetBufferSize(), &pLayout);
+    hr = device->CreateInputLayout(elementDesc, 2, VS->GetBufferPointer(), VS->GetBufferSize(), &pLayout);
+    assert(SUCCEEDED(hr));
+
     deviceContext->IASetInputLayout(pLayout);
 }

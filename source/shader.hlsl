@@ -10,7 +10,7 @@ cbuffer ConstantBuffer : register(b0)
 
 struct VINPUT
 {
-    float4 position : SV_POSITION;
+    float4 position : POSITION;
     float3 normal : NORMAL;
 };
 
@@ -28,7 +28,7 @@ PINPUT VShader(VINPUT input)
     output.position = mul(output.position, view);
     output.position = mul(output.position, projection);
 
-   // output.normal = mul(float4(input.normal, 1), world).xyz;
+    output.normal = mul(float4(input.normal, 1), world).xyz;
 
     return output;
 }
@@ -39,7 +39,7 @@ float4 PShader(PINPUT input) : SV_TARGET
     float4 finalColor = 0;
 
     //Do NdotL lighting for light
-    finalColor += saturate(dot((float3)lightDir, input.normal) * lightColor);
+    finalColor += saturate(dot((float3)-lightDir, normalize(input.normal)) * lightColor);
 
     finalColor.a = 1;
     return finalColor;
