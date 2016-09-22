@@ -29,7 +29,7 @@ int winHeight = 600;
 //Struct for a single vertex
 struct VERTEX {
     XMFLOAT3 position;
-    XMFLOAT4 color;
+    XMFLOAT3 normal;
 };
 
 //Constant buffer struct for shader
@@ -38,6 +38,9 @@ struct ConstantBuffer
     XMMATRIX mWorld;
     XMMATRIX mView;
     XMMATRIX mProjection;
+    XMFLOAT4 vLightDir;
+    XMFLOAT4 vLightColor;
+    XMFLOAT4 vOutputColor;
 };
 
 
@@ -215,6 +218,10 @@ void RenderFrame()
 
     float color[4] = { 0.0f, 0.2f, 0.4f, 1.0f };
 
+    //Set up lighting parameters
+    XMFLOAT4 LightDir = { 0.0f, 0.0f, 1.0f, 1.0f };
+    XMFLOAT4 LightColor = { 0.5f, 0.0f, 0.0f, 1.0f };
+
     //Clear the back buffer to a deep blue
     deviceContext->ClearRenderTargetView(backBuffer, color);
 
@@ -234,7 +241,18 @@ void RenderFrame()
     cb.mWorld = XMMatrixTranspose(worldMatrix);
     cb.mView = XMMatrixTranspose(viewMatrix);
     cb.mProjection = XMMatrixTranspose(projectionMatrix);
+    cb.vLightDir = LightDir;
+    cb.vLightColor = LightColor;
     deviceContext->UpdateSubresource(pConstantBuffer, 0, nullptr, &cb, 0, 0);
+
+    //Render the light
+    XMMATRIX light = XMMatrixTranslationFromVector(5.0f * XMLoadFloat4(&LightDir));
+    XMMATRIX lightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
+    light = lightScale * light;
+
+    //Update world variable to reflect current light
+    //cb.mWorld = XMMatrixTranspose(light);
+    //deviceContext->UpdateSubresource(pConstantBuffer, 0, nullptr, &cb, 0, 0);
 
     //Draw the vertex buffer to the back buffer
     deviceContext->DrawIndexed(36, 0, 0);
@@ -272,14 +290,14 @@ void InitGraphics()
 
     VERTEX vertices[] =
     {
-        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f) },
-        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT4(0.0f, 1.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT4(0.0f, 1.0f, 1.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4(1.0f, 0.0f, 1.0f, 1.0f) },
-        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT4(1.0f, 1.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(1.0f, 1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 0.0f) },
     };
 
     //Create the vertex buffer
@@ -341,9 +359,22 @@ void InitPipeline()
     //Load and compile the two shaders
     ID3D10Blob *VS = nullptr;
     ID3D10Blob *PS = nullptr;
-    D3DCompileFromFile(L"source/shader.hlsl", NULL, NULL, "VShader", "vs_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
-        &VS, 0);
-    D3DCompileFromFile(L"source/shader.hlsl", NULL, NULL, "PShader", "ps_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
+    ID3DBlob *pErrorBlob = nullptr;
+    HRESULT hr = 
+    D3DCompileFromFile(L"source/shader.hlsl", nullptr, nullptr, "VShader", "vs_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
+        &VS, &pErrorBlob);
+
+    if (FAILED(hr))
+    {
+        if (pErrorBlob)
+        {
+            OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+            pErrorBlob->Release();
+        }
+    }
+    if (pErrorBlob) pErrorBlob->Release();
+
+    D3DCompileFromFile(L"source/shader.hlsl", nullptr, nullptr, "PSSolid", "ps_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
         &PS, 0);
 
     //Encapsulate both shaders into the shader objects
@@ -359,7 +390,7 @@ void InitPipeline()
     cBufferDesc.ByteWidth = sizeof(ConstantBuffer);
     cBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     cBufferDesc.CPUAccessFlags = 0;
-    HRESULT hr = device->CreateBuffer(&cBufferDesc, nullptr, &pConstantBuffer);
+    hr = device->CreateBuffer(&cBufferDesc, nullptr, &pConstantBuffer);
 
     //Initialize the view matrix
     XMVECTOR eye = XMVectorSet(0.0f, 1.0f, -5.0f, 0.0f);
