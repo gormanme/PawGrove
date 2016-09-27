@@ -22,6 +22,7 @@ ID3D11Buffer *pIBuffer = nullptr;				//Pointer to index buffer
 ID3D11Buffer *pConstantBuffer = nullptr;      //Pointer to constant buffer
 ID3D11Texture2D *pTexture = nullptr;
 ID3D11ShaderResourceView *pShaderView = nullptr;
+ID3D11SamplerState *pSamplerState = nullptr;
 XMMATRIX worldMatrix = {};
 XMMATRIX viewMatrix = {};
 XMMATRIX projectionMatrix = {};
@@ -238,7 +239,7 @@ void RenderFrame()
 
     //Set up lighting parameters
     XMFLOAT4 LightDir = { 0.0f, 0.0f, 1.0f, 1.0f };
-    XMFLOAT4 LightColor = { 0.5f, 0.0f, 0.0f, 1.0f };
+    XMFLOAT4 LightColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
     //Clear the back buffer to a deep blue
     deviceContext->ClearRenderTargetView(backBuffer, color);
@@ -271,6 +272,8 @@ void RenderFrame()
     //Pass the shader resource view to the shader
     deviceContext->PSSetShaderResources(0, 1, &pShaderView);
 
+    deviceContext->PSSetSamplers(0, 1, &pSamplerState);
+
 
     //Update world variable to reflect current light
     //cb.mWorld = XMMatrixTranspose(light);
@@ -283,6 +286,7 @@ void RenderFrame()
     swapChain->Present(0, 0);
 }
 
+
 //Cleans up Direct3D
 void CleanD3D()
 {
@@ -293,10 +297,16 @@ void CleanD3D()
     pVBuffer->Release();
     pIBuffer->Release();
     pConstantBuffer->Release();
+    pTexture->Release();
+    pShaderView->Release();
+    pSamplerState->Release();
     swapChain->Release();
     backBuffer->Release();
     device->Release();
     deviceContext->Release();
+
+    delete[] targaData;
+    targaData = 0;
 }
 
 //Creates the shape to render
@@ -360,7 +370,7 @@ void InitGraphics()
     memcpy(vMappedResource.pData, vertices, sizeof(vertices));						//copy the data
     deviceContext->Unmap(pVBuffer, NULL);
 
-    short indices[] = 
+    short indices[] =
     {
         3,1,0,
         2,1,3,
@@ -402,7 +412,7 @@ void InitGraphics()
     assert(result == true);
 
     CD3D11_TEXTURE2D_DESC textureDesc(DXGI_FORMAT_R8G8B8A8_UNORM, width, height, 1, 1);
-    
+
     D3D11_SUBRESOURCE_DATA initialData = {};
     initialData.SysMemPitch = 4 * width;
     initialData.pSysMem = targaData;
@@ -413,6 +423,17 @@ void InitGraphics()
     hr = device->CreateShaderResourceView(pTexture, NULL, &pShaderView);
     assert(SUCCEEDED(hr));
 
+    D3D11_SAMPLER_DESC samplerDesc = {};
+    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    samplerDesc.MinLOD = 0;
+    samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+    hr = device->CreateSamplerState(&samplerDesc, &pSamplerState);
+    assert(SUCCEEDED(hr));
 }
 
 

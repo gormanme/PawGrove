@@ -47,10 +47,10 @@ float4 PShader(PINPUT input) : SV_TARGET
 {
     float4 finalColor = 0;
 
-    return albedo.Sample(samplerState, input.tex);
+    float4 surfaceColor = albedo.Sample(samplerState, input.tex);
 
     //Do NdotL lighting for light
-    finalColor += saturate(dot((float3)-lightDir, normalize(input.normal)) * lightColor);
+    finalColor += saturate(dot((float3)-lightDir, normalize(input.normal)) * lightColor * surfaceColor);
 
     finalColor.a = 1;
     return finalColor;
