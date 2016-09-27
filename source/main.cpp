@@ -20,6 +20,8 @@ ID3D11PixelShader *pPS = nullptr;				//Pointer to pixel shader
 ID3D11Buffer *pVBuffer = nullptr;				//Pointer to vertex buffer
 ID3D11Buffer *pIBuffer = nullptr;				//Pointer to index buffer
 ID3D11Buffer *pConstantBuffer = nullptr;      //Pointer to constant buffer
+ID3D11Texture2D *pTexture = nullptr;
+ID3D11ShaderResourceView *pShaderView = nullptr;
 XMMATRIX worldMatrix = {};
 XMMATRIX viewMatrix = {};
 XMMATRIX projectionMatrix = {};
@@ -32,6 +34,7 @@ int winHeight = 600;
 struct VERTEX {
     XMFLOAT3 position;
     XMFLOAT3 normal;
+    XMFLOAT2 texture;
 };
 
 //Constant buffer struct for shader
@@ -265,6 +268,10 @@ void RenderFrame()
     XMMATRIX lightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
     light = lightScale * light;
 
+    //Pass the shader resource view to the shader
+    deviceContext->PSSetShaderResources(0, 1, &pShaderView);
+
+
     //Update world variable to reflect current light
     //cb.mWorld = XMMatrixTranspose(light);
     //deviceContext->UpdateSubresource(pConstantBuffer, 0, nullptr, &cb, 0, 0);
@@ -306,35 +313,35 @@ void InitGraphics()
 
     VERTEX vertices[] =
     {
-        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
 
-        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f) },
-        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f) },
-        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, -1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
 
-        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f) },
-        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(-1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
 
-        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
-        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f) },
+        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(1.0f, 0.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
 
-        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f) },
-        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f) },
-        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(1.0f, 1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(1.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },
 
-        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
-        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f) },
+        { XMFLOAT3(-1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f), XMFLOAT2(1.0f, 1.0f) },
+        { XMFLOAT3(1.0f, -1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f), XMFLOAT2(0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f), XMFLOAT2(0.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f), XMFLOAT2(1.0f, 0.0f) },
     };
 
     //Create the vertex buffer
@@ -388,6 +395,23 @@ void InitGraphics()
     deviceContext->Map(pIBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &iMappedResource);	//Map the buffer
     memcpy(iMappedResource.pData, indices, sizeof(indices));								//Copy the data
     deviceContext->Unmap(pIBuffer, NULL);
+
+    int width = 0;
+    int height = 0;
+    bool result = LoadTarga("assets/stone.tga", height, width);
+    assert(result == true);
+
+    CD3D11_TEXTURE2D_DESC textureDesc(DXGI_FORMAT_R8G8B8A8_UNORM, width, height, 1, 1);
+    
+    D3D11_SUBRESOURCE_DATA initialData = {};
+    initialData.SysMemPitch = 4 * width;
+    initialData.pSysMem = targaData;
+
+    hr = device->CreateTexture2D(&textureDesc, &initialData, &pTexture);
+    assert(SUCCEEDED(hr));
+
+    hr = device->CreateShaderResourceView(pTexture, NULL, &pShaderView);
+    assert(SUCCEEDED(hr));
 
 }
 
@@ -457,15 +481,17 @@ void InitPipeline()
     deviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
     deviceContext->PSSetConstantBuffers(0, 1, &pConstantBuffer);
     deviceContext->PSSetShader(pPS, 0, 0);
+    deviceContext->PSSetShaderResources(0, 1, &pShaderView);
 
     //Create the input layout object
     D3D11_INPUT_ELEMENT_DESC elementDesc[] = 
     {
         { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
     };
 
-    hr = device->CreateInputLayout(elementDesc, 2, VS->GetBufferPointer(), VS->GetBufferSize(), &pLayout);
+    hr = device->CreateInputLayout(elementDesc, _countof(elementDesc), VS->GetBufferPointer(), VS->GetBufferSize(), &pLayout);
     assert(SUCCEEDED(hr));
 
     deviceContext->IASetInputLayout(pLayout);
@@ -474,15 +500,14 @@ void InitPipeline()
 
 bool LoadTarga(char* filename, int& height, int& width)
 {
-    int error, bpp, imageSize, index, i, j, k;
-    FILE* filePtr;
-    unsigned int count;
-    TargaHeader targaFileHeader;
-    unsigned char* targaImage;
+    FILE* filePtr = nullptr;
+    unsigned int count = 0;
+    TargaHeader targaFileHeader = {};
+    unsigned char* targaImage = nullptr;
 
 
     // Open the targa file for reading in binary.
-    error = fopen_s(&filePtr, filename, "rb");
+    int error = fopen_s(&filePtr, filename, "rb");
     if (error != 0)
     {
         return false;
@@ -498,7 +523,7 @@ bool LoadTarga(char* filename, int& height, int& width)
     // Get the important information from the header.
     height = (int)targaFileHeader.height;
     width = (int)targaFileHeader.width;
-    bpp = (int)targaFileHeader.bpp;
+    int bpp = (int)targaFileHeader.bpp;
 
     // Check that it is 32 bit and not 24 bit.
     if (bpp != 32)
@@ -507,7 +532,7 @@ bool LoadTarga(char* filename, int& height, int& width)
     }
 
     // Calculate the size of the 32 bit image data.
-    imageSize = width * height * 4;
+    int imageSize = width * height * 4;
 
     // Allocate memory for the targa image data.
     targaImage = new unsigned char[imageSize];
@@ -534,15 +559,15 @@ bool LoadTarga(char* filename, int& height, int& width)
     targaData = new unsigned char[imageSize];
 
     // Initialize the index into the targa destination data array.
-    index = 0;
+    int index = 0;
 
     // Initialize the index into the targa image data.
-    k = (width * height * 4) - (width * 4);
+    int k = (width * height * 4) - (width * 4);
 
     // Now copy the targa image data into the targa destination array in the correct order since the targa format is stored upside down.
-    for (j = 0; j<height; j++)
+    for (int j = 0; j<height; j++)
     {
-        for (i = 0; i<width; i++)
+        for (int i = 0; i<width; i++)
         {
             targaData[index + 0] = targaImage[k + 2];  // Red.
             targaData[index + 1] = targaImage[k + 1];  // Green.

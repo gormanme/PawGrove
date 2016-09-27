@@ -12,13 +12,20 @@ struct VINPUT
 {
     float4 position : POSITION;
     float3 normal : NORMAL;
+    float2 tex : TEXCOORD;
 };
 
 struct PINPUT
 {
     float4 position : SV_POSITION;
     float3 normal : TEXCOORD0;
+    float2 tex : TEXCOORD1;
 };
+
+//Albedo means surface color :)
+Texture2D albedo : register(t0);
+
+SamplerState samplerState : register(s0);
 
 PINPUT VShader(VINPUT input)
 {
@@ -30,6 +37,8 @@ PINPUT VShader(VINPUT input)
 
     output.normal = mul(float4(input.normal, 1), world).xyz;
 
+    output.tex = input.tex;
+
     return output;
 }
 
@@ -37,6 +46,8 @@ PINPUT VShader(VINPUT input)
 float4 PShader(PINPUT input) : SV_TARGET
 {
     float4 finalColor = 0;
+
+    return albedo.Sample(samplerState, input.tex);
 
     //Do NdotL lighting for light
     finalColor += saturate(dot((float3)-lightDir, normalize(input.normal)) * lightColor);
