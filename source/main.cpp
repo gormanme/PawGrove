@@ -10,16 +10,16 @@ using namespace DirectX;
 #pragma comment (lib, "d3dcompiler.lib")
 
 //Global declarations
-IDXGISwapChain *swapChain = nullptr;            //Pointer to swap chain interface
-ID3D11Device *device = nullptr;                    //Pointer to Direct3D device interface
+IDXGISwapChain *swapChain = nullptr;             //Pointer to swap chain interface
+ID3D11Device *device = nullptr;                  //Pointer to Direct3D device interface
 ID3D11DeviceContext *deviceContext = nullptr;    //Pointer to Direct3D device context
 ID3D11RenderTargetView *backBuffer = nullptr;    //Pointer to the back buffer
 ID3D11InputLayout *pLayout = nullptr;            //Pointer to the input layout
-ID3D11VertexShader *pVS = nullptr;                //Pointer to vertex shader
+ID3D11VertexShader *pVS = nullptr;               //Pointer to vertex shader
 ID3D11PixelShader *pPS = nullptr;                //Pointer to pixel shader
 ID3D11Buffer *pVBuffer = nullptr;                //Pointer to vertex buffer
 ID3D11Buffer *pIBuffer = nullptr;                //Pointer to index buffer
-ID3D11Buffer *pConstantBuffer = nullptr;      //Pointer to constant buffer
+ID3D11Buffer *pConstantBuffer = nullptr;         //Pointer to constant buffer
 ID3D11Texture2D *pTexture = nullptr;
 ID3D11ShaderResourceView *pShaderView = nullptr;
 ID3D11SamplerState *pSamplerState = nullptr;
@@ -63,7 +63,7 @@ struct TargaHeader
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow);
 void InitD3D(HWND hWnd);            //Sets up and initializes Direct3D
-void RenderFrame();                    //Renders a single frame
+void RenderFrame();                 //Renders a single frame
 void CleanD3D();                    //Closes Direct3D and releases memory
 void InitGraphics();                //Creates the shape to render
 void InitPipeline();                //Loads and prepares the shaders
@@ -99,17 +99,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
 
     //Create the window and use the result as the handle
     hWnd = CreateWindowEx(NULL,
-        L"WindowClass1",    // name of the window class
-        L"PawGrove",   // title of the window
-        WS_OVERLAPPEDWINDOW,    // window style
-        300,    // x-position of the window
-        300,    // y-position of the window
-        wr.right - wr.left,    // width of the window
-        wr.bottom - wr.top,    // height of the window
-        NULL,    // we have no parent window, NULL
-        NULL,    // we aren't using menus, NULL
-        hInstance,    // application handle
-        NULL);    // used with multiple windows, NULL
+        L"WindowClass1",           // name of the window class
+        L"PawGrove",               // title of the window
+        WS_OVERLAPPEDWINDOW,       // window style
+        300,                       // x-position of the window
+        300,                       // y-position of the window
+        wr.right - wr.left,        // width of the window
+        wr.bottom - wr.top,        // height of the window
+        NULL,                      // we have no parent window, NULL
+        NULL,                      // we aren't using menus, NULL
+        hInstance,                 // application handle
+        NULL);                     // used with multiple windows, NULL
 
     //Display the window on the screen
     ShowWindow(hWnd, nCmdShow);
@@ -164,6 +164,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             return 0;
         }
         break;
+
+        //When escape key is pressed, quit the application
+        case WM_KEYUP:
+        {
+            if (wParam == VK_ESCAPE)
+            {
+                PostQuitMessage(0);
+                return 0;
+            }
+        }
+        break;
     }
 
     //Handle any messages the switch statement didn't
@@ -179,12 +190,12 @@ void InitD3D(HWND hWnd)
     DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
 
     //Fill in teh swap chain description struct
-    swapChainDesc.BufferCount = 1;                                    //One back buffer
-    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;    //Use 32-bit color
+    swapChainDesc.BufferCount = 1;                                  //One back buffer
+    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;   //Use 32-bit color
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;    //How swap chain is to be used
-    swapChainDesc.OutputWindow = hWnd;                                //The window to be used
-    swapChainDesc.SampleDesc.Count = 4;                                //How many multisamples
-    swapChainDesc.Windowed = true;                                    //Windowed/full-screen mode
+    swapChainDesc.OutputWindow = hWnd;                              //The window to be used
+    swapChainDesc.SampleDesc.Count = 4;                             //How many multisamples
+    swapChainDesc.Windowed = true;                                  //Windowed/full-screen mode
 
     //Create a device, device context, and swap chain using the information in the swapChainDesc struct
     D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, D3D11_CREATE_DEVICE_DEBUG, NULL, NULL, D3D11_SDK_VERSION,
@@ -356,10 +367,10 @@ void InitGraphics()
 
     //Create the vertex buffer
     D3D11_BUFFER_DESC vBufferDesc = {};
-    vBufferDesc.Usage = D3D11_USAGE_DYNAMIC;                //Write access by CPU and GPU
-    vBufferDesc.ByteWidth = sizeof(vertices);            //Size is the VERTEX struct * number of vertices
+    vBufferDesc.Usage = D3D11_USAGE_DYNAMIC;                 //Write access by CPU and GPU
+    vBufferDesc.ByteWidth = sizeof(vertices);                //Size is the VERTEX struct * number of vertices
     vBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;        //Use as a vertex buffer
-    vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;    //Allow CPU to write in buffer
+    vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;     //Allow CPU to write in buffer
 
     hr = device->CreateBuffer(&vBufferDesc, NULL, &pVBuffer);
     assert(SUCCEEDED(hr));
