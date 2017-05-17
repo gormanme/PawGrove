@@ -4,6 +4,8 @@
 #include <directxmath.h>
 #include <stdio.h>
 
+#include "Camera.h"
+
 using namespace DirectX;
 
 #pragma comment (lib, "d3d11.lib")
