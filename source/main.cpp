@@ -231,7 +231,7 @@ void InitD3D(HWND hWnd)
     DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
 
     //Fill in teh swap chain description struct
-    swapChainDesc.BufferCount = 1;                                  //One back buffer
+    swapChainDesc.BufferCount = 3;                                  //One back buffer
     swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;   //Use 32-bit color
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;    //How swap chain is to be used
     swapChainDesc.OutputWindow = hWnd;                              //The window to be used
@@ -335,7 +335,7 @@ void RenderFrame()
     deviceContext->DrawIndexed(36, 0, 0);
 
     //Switch the back buffer and the front buffer to present to screen
-    swapChain->Present(0, 0);
+    swapChain->Present(1, 0);
 }
 
 
