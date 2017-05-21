@@ -29,6 +29,7 @@ XMMATRIX worldMatrix = {};
 XMMATRIX viewMatrix = {};
 XMMATRIX projectionMatrix = {};
 unsigned char* targaData = nullptr;
+Camera camera;
 
 int winWidth = 800;
 int winHeight = 600;
@@ -83,6 +84,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     //Windows event messages struct
     MSG msg = {};
 
+    //GetTickCount() returns milliseconds, when we want seconds
+    LARGE_INTEGER frequency = {};
+    LARGE_INTEGER prevTime = {};
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&prevTime);
+
     //Fill in the window class with needed information
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.style = CS_HREDRAW | CS_VREDRAW;
@@ -119,10 +126,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     //Sets up and initialize Direct3D
     InitD3D(hWnd);
 
+    //Initialize game stuff (camera)
+    camera.SetLens(XM_PI/3, winWidth / (float)winHeight, 0.01f, 100.0f);
+    XMVECTOR eye = XMVectorSet(0.0f, 1.0f, -5.0f, 0.0f);
+    XMVECTOR at = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+    camera.LookAt(eye, at, up);
+
     //Main loop:
-    //Check to see if any messages are waiting in the queue
     while (true)
     {
+        //Check to see if any messages are waiting in the queue
         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
 
@@ -139,6 +153,30 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
             }
         }
         
+        //Already have previous time
+        //Get current time
+        //Subtract current time from previous time
+        LARGE_INTEGER currTime = {};
+        QueryPerformanceCounter(&currTime);
+        float deltaTime = (currTime.QuadPart - prevTime.QuadPart) / (float)frequency.QuadPart;
+        prevTime = currTime;
+
+        //Update the frame with camera controls
+        // Camera controls
+        if (GetAsyncKeyState('W') & 0x8000)
+            camera.Walk(10.0f*deltaTime);
+
+        if (GetAsyncKeyState('S') & 0x8000)
+            camera.Walk(-10.0f*deltaTime);
+
+        if (GetAsyncKeyState('A') & 0x8000)
+            camera.Strafe(-10.0f*deltaTime);
+
+        if (GetAsyncKeyState('D') & 0x8000)
+            camera.Strafe(10.0f*deltaTime);
+
+        camera.UpdateViewMatrix();
+
         //Render the frame:
         RenderFrame();
 
@@ -177,6 +215,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             }
         }
         break;
+
     }
 
     //Handle any messages the switch statement didn't
@@ -271,8 +310,8 @@ void RenderFrame()
     //Update variables for shader
     ConstantBuffer cb = {};
     cb.mWorld = XMMatrixTranspose(worldMatrix);
-    cb.mView = XMMatrixTranspose(viewMatrix);
-    cb.mProjection = XMMatrixTranspose(projectionMatrix);
+    cb.mView = XMMatrixTranspose(camera.View());
+    cb.mProjection = XMMatrixTranspose(camera.Proj());
     cb.vLightDir = LightDir;
     cb.vLightColor = LightColor;
     deviceContext->UpdateSubresource(pConstantBuffer, 0, nullptr, &cb, 0, 0);
@@ -509,6 +548,7 @@ void InitPipeline()
 
     //Initialize the projection matrix
     projectionMatrix = XMMatrixPerspectiveFovLH(XM_PIDIV2, winWidth / (float)winHeight, 0.01f, 100.0f);
+
 
     //Set the shader objects
     deviceContext->VSSetShader(pVS, 0, 0);
