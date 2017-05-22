@@ -34,6 +34,7 @@ XMMATRIX projectionMatrix = {};
 unsigned char* targaData = nullptr;
 Camera camera;
 Object cube;
+Object ground;
 
 int winWidth = 800;
 int winHeight = 600;
@@ -305,9 +306,12 @@ void RenderFrame()
     UINT stride = sizeof(VERTEX);
     UINT offset = 0;
     deviceContext->IASetVertexBuffers(0, 1, &cube.pVBuffer, &stride, &offset);
+    deviceContext->IASetVertexBuffers(1, 1, &ground.pVBuffer, &stride, &offset);
 
     //Set index buffer
     deviceContext->IASetIndexBuffer(cube.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
+    deviceContext->IASetIndexBuffer(ground.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
+
 
     //Select which primitive type we are using
     deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -328,6 +332,8 @@ void RenderFrame()
 
     //Pass the shader resource view to the shader
     deviceContext->PSSetShaderResources(0, 1, &cube.pShaderView);
+    deviceContext->PSSetShaderResources(1, 1, &ground.pShaderView);
+
 
     deviceContext->PSSetSamplers(0, 1, &pSamplerState);
 
@@ -337,7 +343,7 @@ void RenderFrame()
     //deviceContext->UpdateSubresource(pConstantBuffer, 0, nullptr, &cb, 0, 0);
 
     //Draw the vertex buffer to the back buffer
-    deviceContext->DrawIndexed(36, 0, 0);
+    deviceContext->DrawIndexed(42, 0, 0);
 
     //Switch the back buffer and the front buffer to present to screen
     swapChain->Present(1, 0);
@@ -352,10 +358,14 @@ void CleanD3D()
     pVS->Release();
     pPS->Release();
     cube.pVBuffer->Release();
+    ground.pIBuffer->Release();
     cube.pIBuffer->Release();
+    ground.pIBuffer->Release();
     pConstantBuffer->Release();
     cube.pTexture->Release();
+    ground.pTexture->Release();
     cube.pShaderView->Release();
+    ground.pShaderView->Release();
     pSamplerState->Release();
     swapChain->Release();
     backBuffer->Release();
@@ -448,7 +458,7 @@ void InitGraphics()
     //    { -0.45f, -0.5f, 0.0f, {0.0f, 0.0f, 1.0f, 1.0f} }
     //};
 
-    VERTEX vertices[] =
+    VERTEX cubeVertices[] =
     {
         { XMFLOAT3(-1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
         { XMFLOAT3(1.0f, 1.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
@@ -481,7 +491,15 @@ void InitGraphics()
         { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f), XMFLOAT2(1.0f, 0.0f) },
     };
 
-    short indices[] =
+    VERTEX groundVertices[]=
+    {
+        { XMFLOAT3(-1.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 0.0f) },
+        { XMFLOAT3(1.0f, 0.0f, -1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 0.0f) },
+        { XMFLOAT3(-1.0f, 0.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(0.0f, 1.0f) },
+        { XMFLOAT3(1.0f, 0.0f, 1.0f), XMFLOAT3(0.0f, 1.0f, 0.0f), XMFLOAT2(1.0f, 1.0f) },
+    };
+
+    short cubeIndices[] =
     {
         3,1,0,
         2,1,3,
@@ -502,7 +520,14 @@ void InitGraphics()
         23,20,22
     };
 
-    cube = SetupObject(vertices, sizeof(vertices), indices, sizeof(indices), "assets/stone.tga");
+    short groundIndices[] =
+    {
+        0,1,2,
+        2,1,3
+    };
+
+    cube = SetupObject(cubeVertices, sizeof(cubeVertices), cubeIndices, sizeof(cubeIndices), "assets/stone.tga");
+    ground = SetupObject(groundVertices, sizeof(groundVertices), groundIndices, sizeof(groundIndices), "assets/stone.tga");
 
 }
 
@@ -574,6 +599,7 @@ void InitPipeline()
     deviceContext->PSSetConstantBuffers(0, 1, &pConstantBuffer);
     deviceContext->PSSetShader(pPS, 0, 0);
     deviceContext->PSSetShaderResources(0, 1, &cube.pShaderView);
+    deviceContext->PSSetShaderResources(1, 1, &cube.pShaderView);
 
     //Create the input layout object
     D3D11_INPUT_ELEMENT_DESC elementDesc[] = 
