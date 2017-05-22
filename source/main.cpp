@@ -11,6 +11,13 @@ using namespace DirectX;
 #pragma comment (lib, "d3d11.lib")
 #pragma comment (lib, "d3dcompiler.lib")
 
+struct Object {
+    ID3D11Buffer *pVBuffer = nullptr;                //Pointer to vertex buffer
+    ID3D11Buffer *pIBuffer = nullptr;                //Pointer to index buffer
+    ID3D11Texture2D *pTexture = nullptr;
+    ID3D11ShaderResourceView *pShaderView = nullptr;
+};
+
 //Global declarations
 IDXGISwapChain *swapChain = nullptr;             //Pointer to swap chain interface
 ID3D11Device *device = nullptr;                  //Pointer to Direct3D device interface
@@ -19,17 +26,14 @@ ID3D11RenderTargetView *backBuffer = nullptr;    //Pointer to the back buffer
 ID3D11InputLayout *pLayout = nullptr;            //Pointer to the input layout
 ID3D11VertexShader *pVS = nullptr;               //Pointer to vertex shader
 ID3D11PixelShader *pPS = nullptr;                //Pointer to pixel shader
-ID3D11Buffer *pVBuffer = nullptr;                //Pointer to vertex buffer
-ID3D11Buffer *pIBuffer = nullptr;                //Pointer to index buffer
 ID3D11Buffer *pConstantBuffer = nullptr;         //Pointer to constant buffer
-ID3D11Texture2D *pTexture = nullptr;
-ID3D11ShaderResourceView *pShaderView = nullptr;
 ID3D11SamplerState *pSamplerState = nullptr;
 XMMATRIX worldMatrix = {};
 XMMATRIX viewMatrix = {};
 XMMATRIX projectionMatrix = {};
 unsigned char* targaData = nullptr;
 Camera camera;
+Object cube;
 
 int winWidth = 800;
 int winHeight = 600;
@@ -70,7 +74,8 @@ void RenderFrame();                 //Renders a single frame
 void CleanD3D();                    //Closes Direct3D and releases memory
 void InitGraphics();                //Creates the shape to render
 void InitPipeline();                //Loads and prepares the shaders
-bool LoadTarga(char* filename, int& height, int& width);
+bool LoadTarga(const char* filename, int& height, int& width);
+Object SetupObject(VERTEX* vertices, UINT vertices_size, short *indices, UINT indices_size, const char *targa);
 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
@@ -299,10 +304,10 @@ void RenderFrame()
     //Select which vertex buffer to display
     UINT stride = sizeof(VERTEX);
     UINT offset = 0;
-    deviceContext->IASetVertexBuffers(0, 1, &pVBuffer, &stride, &offset);
+    deviceContext->IASetVertexBuffers(0, 1, &cube.pVBuffer, &stride, &offset);
 
     //Set index buffer
-    deviceContext->IASetIndexBuffer(pIBuffer, DXGI_FORMAT_R16_UINT, 0);
+    deviceContext->IASetIndexBuffer(cube.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
 
     //Select which primitive type we are using
     deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -322,7 +327,7 @@ void RenderFrame()
     light = lightScale * light;
 
     //Pass the shader resource view to the shader
-    deviceContext->PSSetShaderResources(0, 1, &pShaderView);
+    deviceContext->PSSetShaderResources(0, 1, &cube.pShaderView);
 
     deviceContext->PSSetSamplers(0, 1, &pSamplerState);
 
@@ -346,11 +351,11 @@ void CleanD3D()
     pLayout->Release();
     pVS->Release();
     pPS->Release();
-    pVBuffer->Release();
-    pIBuffer->Release();
+    cube.pVBuffer->Release();
+    cube.pIBuffer->Release();
     pConstantBuffer->Release();
-    pTexture->Release();
-    pShaderView->Release();
+    cube.pTexture->Release();
+    cube.pShaderView->Release();
     pSamplerState->Release();
     swapChain->Release();
     backBuffer->Release();
@@ -359,6 +364,76 @@ void CleanD3D()
 
     delete[] targaData;
     targaData = 0;
+}
+
+Object SetupObject(VERTEX* vertices, UINT vertices_size, short *indices, UINT indices_size, const char *targa) 
+{
+    HRESULT hr = S_OK;
+    Object object;
+
+    //Create the vertex buffer
+    D3D11_BUFFER_DESC vBufferDesc = {};
+    vBufferDesc.Usage = D3D11_USAGE_DYNAMIC;                 //Write access by CPU and GPU
+    vBufferDesc.ByteWidth = vertices_size;                //Size is the VERTEX struct * number of vertices
+    vBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;        //Use as a vertex buffer
+    vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;     //Allow CPU to write in buffer
+
+    hr = device->CreateBuffer(&vBufferDesc, NULL, &object.pVBuffer);
+    assert(SUCCEEDED(hr));
+
+    //Copy the vertices into the buffer
+    D3D11_MAPPED_SUBRESOURCE vMappedResource = {};
+    deviceContext->Map(object.pVBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &vMappedResource);    //map the buffer
+    memcpy(vMappedResource.pData, vertices, vertices_size);                        //copy the data
+    deviceContext->Unmap(object.pVBuffer, NULL);
+
+    D3D11_BUFFER_DESC iBufferDesc = {};
+    iBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    iBufferDesc.ByteWidth = indices_size;
+    iBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+    iBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    //Create index buffer
+    hr = device->CreateBuffer(&iBufferDesc, NULL, &object.pIBuffer);
+    assert(SUCCEEDED(hr));
+
+    //Copy the indices into the buffer
+    D3D11_MAPPED_SUBRESOURCE iMappedResource = {};
+    deviceContext->Map(object.pIBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &iMappedResource);    //Map the buffer
+    memcpy(iMappedResource.pData, indices, indices_size);                                //Copy the data
+    deviceContext->Unmap(object.pIBuffer, NULL);
+
+    int width = 0;
+    int height = 0;
+    //bool result = LoadTarga("assets/stone.tga", height, width);
+    bool result = LoadTarga(targa, height, width);
+    assert(result == true);
+
+    CD3D11_TEXTURE2D_DESC textureDesc(DXGI_FORMAT_R8G8B8A8_UNORM, width, height, 1, 1);
+
+    D3D11_SUBRESOURCE_DATA initialData = {};
+    initialData.SysMemPitch = 4 * width;
+    initialData.pSysMem = targaData;
+
+    hr = device->CreateTexture2D(&textureDesc, &initialData, &object.pTexture);
+    assert(SUCCEEDED(hr));
+
+    hr = device->CreateShaderResourceView(object.pTexture, NULL, &object.pShaderView);
+    assert(SUCCEEDED(hr));
+
+    D3D11_SAMPLER_DESC samplerDesc = {};
+    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    samplerDesc.MinLOD = 0;
+    samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+    hr = device->CreateSamplerState(&samplerDesc, &pSamplerState);
+    assert(SUCCEEDED(hr));
+
+    return object;
 }
 
 //Creates the shape to render
@@ -406,22 +481,6 @@ void InitGraphics()
         { XMFLOAT3(-1.0f, 1.0f, 1.0f), XMFLOAT3(0.0f, 0.0f, 1.0f), XMFLOAT2(1.0f, 0.0f) },
     };
 
-    //Create the vertex buffer
-    D3D11_BUFFER_DESC vBufferDesc = {};
-    vBufferDesc.Usage = D3D11_USAGE_DYNAMIC;                 //Write access by CPU and GPU
-    vBufferDesc.ByteWidth = sizeof(vertices);                //Size is the VERTEX struct * number of vertices
-    vBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;        //Use as a vertex buffer
-    vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;     //Allow CPU to write in buffer
-
-    hr = device->CreateBuffer(&vBufferDesc, NULL, &pVBuffer);
-    assert(SUCCEEDED(hr));
-
-    //Copy the vertices into the buffer
-    D3D11_MAPPED_SUBRESOURCE vMappedResource = {};
-    deviceContext->Map(pVBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &vMappedResource);    //map the buffer
-    memcpy(vMappedResource.pData, vertices, sizeof(vertices));                        //copy the data
-    deviceContext->Unmap(pVBuffer, NULL);
-
     short indices[] =
     {
         3,1,0,
@@ -442,50 +501,9 @@ void InitGraphics()
         22,20,21,
         23,20,22
     };
-    D3D11_BUFFER_DESC iBufferDesc = {};
-    iBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-    iBufferDesc.ByteWidth = sizeof(indices);
-    iBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-    iBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    //Create index buffer
-    hr = device->CreateBuffer(&iBufferDesc, NULL, &pIBuffer);
-    assert(SUCCEEDED(hr));
+    cube = SetupObject(vertices, sizeof(vertices), indices, sizeof(indices), "assets/stone.tga");
 
-    //Copy the indices into the buffer
-    D3D11_MAPPED_SUBRESOURCE iMappedResource = {};
-    deviceContext->Map(pIBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &iMappedResource);    //Map the buffer
-    memcpy(iMappedResource.pData, indices, sizeof(indices));                                //Copy the data
-    deviceContext->Unmap(pIBuffer, NULL);
-
-    int width = 0;
-    int height = 0;
-    bool result = LoadTarga("assets/stone.tga", height, width);
-    assert(result == true);
-
-    CD3D11_TEXTURE2D_DESC textureDesc(DXGI_FORMAT_R8G8B8A8_UNORM, width, height, 1, 1);
-
-    D3D11_SUBRESOURCE_DATA initialData = {};
-    initialData.SysMemPitch = 4 * width;
-    initialData.pSysMem = targaData;
-
-    hr = device->CreateTexture2D(&textureDesc, &initialData, &pTexture);
-    assert(SUCCEEDED(hr));
-
-    hr = device->CreateShaderResourceView(pTexture, NULL, &pShaderView);
-    assert(SUCCEEDED(hr));
-
-    D3D11_SAMPLER_DESC samplerDesc = {};
-    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-    samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-    samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-    samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-    samplerDesc.MinLOD = 0;
-    samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-
-    hr = device->CreateSamplerState(&samplerDesc, &pSamplerState);
-    assert(SUCCEEDED(hr));
 }
 
 
@@ -555,7 +573,7 @@ void InitPipeline()
     deviceContext->VSSetConstantBuffers(0, 1, &pConstantBuffer);
     deviceContext->PSSetConstantBuffers(0, 1, &pConstantBuffer);
     deviceContext->PSSetShader(pPS, 0, 0);
-    deviceContext->PSSetShaderResources(0, 1, &pShaderView);
+    deviceContext->PSSetShaderResources(0, 1, &cube.pShaderView);
 
     //Create the input layout object
     D3D11_INPUT_ELEMENT_DESC elementDesc[] = 
@@ -572,7 +590,7 @@ void InitPipeline()
 }
 
 
-bool LoadTarga(char* filename, int& height, int& width)
+bool LoadTarga(const char* filename, int& height, int& width)
 {
     FILE* filePtr = nullptr;
     unsigned int count = 0;
