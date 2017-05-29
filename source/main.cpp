@@ -39,6 +39,7 @@ Object cube;
 Object ground;
 ID3D11Texture2D *depthStencilBuffer = nullptr;
 ID3D11DepthStencilView *depthStencilView = nullptr;
+ID3D11DepthStencilState *depthStencilState = nullptr;
 
 IDXGIDebug* debug = nullptr;
 
@@ -284,6 +285,8 @@ void InitD3D(HWND hWnd)
     viewPort.TopLeftY = 0;
     viewPort.Width = (float)winWidth;
     viewPort.Height = (float)winHeight;
+    viewPort.MinDepth = 0.0f;
+    viewPort.MaxDepth = 1.0f;
 
     deviceContext->RSSetViewports(1, &viewPort);
 
@@ -320,13 +323,11 @@ void RenderFrame()
     deviceContext->ClearRenderTargetView(backBuffer, color);
     deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
+    //deviceContext->OMSetDepthStencilState(depthStencilState, 0);
+
     //Select which vertex buffer to display
     UINT stride = sizeof(VERTEX);
     UINT offset = 0;
-    deviceContext->IASetVertexBuffers(0, 1, &cube.pVBuffer, &stride, &offset);
-
-    //Set index buffer
-    deviceContext->IASetIndexBuffer(cube.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
 
     //Select which primitive type we are using
     deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -345,9 +346,6 @@ void RenderFrame()
     const XMMATRIX lightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
     light = lightScale * light;
 
-    //Pass the shader resource view to the shader
-    deviceContext->PSSetShaderResources(0, 1, &cube.pShaderView);
-
     deviceContext->PSSetSamplers(0, 1, &pSamplerState);
 
 
@@ -355,15 +353,20 @@ void RenderFrame()
     //cb.mWorld = XMMatrixTranspose(light);
     //deviceContext->UpdateSubresource(pConstantBuffer, 0, nullptr, &cb, 0, 0);
 
-    //Draw the vertex buffer to the back buffer
-    //Cube:
-    deviceContext->DrawIndexed(36, 0, 0);
 
+    //Draw the vertex buffer to the back buffer
     //Ground:
     deviceContext->IASetVertexBuffers(0, 1, &ground.pVBuffer, &stride, &offset);
     deviceContext->IASetIndexBuffer(ground.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
     deviceContext->PSSetShaderResources(0, 1, &ground.pShaderView);
     deviceContext->DrawIndexed(6, 0, 0);
+    //Cube:
+    deviceContext->IASetVertexBuffers(0, 1, &cube.pVBuffer, &stride, &offset);
+    deviceContext->IASetIndexBuffer(cube.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
+    deviceContext->PSSetShaderResources(0, 1, &cube.pShaderView);
+    deviceContext->DrawIndexed(36, 0, 0);
+
+
 
     //Switch the back buffer and the front buffer to present to screen
     swapChain->Present(1, 0);
@@ -388,6 +391,7 @@ void CleanD3D()
     ground.pShaderView->Release();
     depthStencilBuffer->Release();
     depthStencilView->Release();
+    depthStencilState->Release();
     pSamplerState->Release();
     swapChain->Release();
     backBuffer->Release();
@@ -484,10 +488,17 @@ void CreateDepthBuffer()
     hr = device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilBuffer);
     assert(SUCCEEDED(hr));
 
-    hr = device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthStencilView);
+    D3D11_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc = {};
+    depthStencilViewDesc.Format = depthStencilDesc.Format;
+    depthStencilViewDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+    depthStencilViewDesc.Texture2D.MipSlice = 0;
+
+    hr = device->CreateDepthStencilView(depthStencilBuffer, &depthStencilViewDesc, &depthStencilView);
     assert(SUCCEEDED(hr));
 
 }
+
+
 
 //Creates the shape to render
 void InitGraphics()
@@ -667,6 +678,16 @@ void InitPipeline()
 
     hr = device->CreateSamplerState(&samplerDesc, &pSamplerState);
     assert(SUCCEEDED(hr));
+
+    D3D11_DEPTH_STENCIL_DESC depthStencilDesc = {};
+    depthStencilDesc.DepthEnable = TRUE;
+    depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    depthStencilDesc.DepthFunc = D3D11_COMPARISON_LESS;
+    depthStencilDesc.StencilEnable = FALSE;
+
+    hr = device->CreateDepthStencilState(&depthStencilDesc, &depthStencilState);
+    assert(SUCCEEDED(hr));
+
 }
 
 
