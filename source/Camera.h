@@ -71,14 +71,14 @@ private:
     XMFLOAT3 mLook;     //view space z-axis
 
     //Cache frustum roperties
-    float mNearZ;
-    float mFarZ;
-    float mAspect;
-    float mFovY;
-    float mNearWindowHeight;
-    float mFarWindowHeight;
+    float mNearZ = 1.0f;
+    float mFarZ = 1000.0f;
+    float mAspect = 1.0f;
+    float mFovY = 1.0f;
+    float mNearWindowHeight = 0.0f;
+    float mFarWindowHeight = 0.0f;
 
     //Cache View/Proj matrices
-    XMFLOAT4X4 mView;
-    XMFLOAT4X4 mProj;
+	XMFLOAT4X4 mView = {};
+	XMFLOAT4X4 mProj = {};
 };

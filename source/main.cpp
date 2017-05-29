@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <d3d11.h>
+#include <dxgidebug.h>
 #include <d3dcompiler.h>
 #include <directxmath.h>
 #include <stdio.h>
@@ -9,6 +10,7 @@
 using namespace DirectX;
 
 #pragma comment (lib, "d3d11.lib")
+#pragma comment (lib, "dxguid.lib")
 #pragma comment (lib, "d3dcompiler.lib")
 
 struct Object {
@@ -35,9 +37,13 @@ unsigned char* targaData = nullptr;
 Camera camera;
 Object cube;
 Object ground;
+ID3D11Texture2D *depthStencilBuffer = nullptr;
+ID3D11DepthStencilView *depthStencilView = nullptr;
 
-int winWidth = 800;
-int winHeight = 600;
+IDXGIDebug* debug = nullptr;
+
+const int winWidth = 800;
+const int winHeight = 600;
 
 //Struct for a single vertex
 struct VERTEX {
@@ -69,7 +75,7 @@ struct TargaHeader
 
 //Function declarations:
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow);
+void CreateDepthBuffer();           //Creates depth buffer
 void InitD3D(HWND hWnd);            //Sets up and initializes Direct3D
 void RenderFrame();                 //Renders a single frame
 void CleanD3D();                    //Closes Direct3D and releases memory
@@ -79,7 +85,7 @@ bool LoadTarga(const char* filename, int& height, int& width);
 Object SetupObject(VERTEX* vertices, UINT vertices_size, short *indices, UINT indices_size, const char *targa);
 
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
 {
     //Handle for the window
     HWND hWnd = nullptr;
@@ -101,8 +107,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hInstance;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.hbrBackground = (HBRUSH)COLOR_WINDOW;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hbrBackground = nullptr;
     wc.lpszClassName = L"WindowClass1";
 
     //Register the window class
@@ -113,7 +119,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE); //Adjust the size
 
     //Create the window and use the result as the handle
-    hWnd = CreateWindowEx(NULL,
+    hWnd = CreateWindowEx(0,
         L"WindowClass1",           // name of the window class
         L"PawGrove",               // title of the window
         WS_OVERLAPPEDWINDOW,       // window style
@@ -121,19 +127,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         300,                       // y-position of the window
         wr.right - wr.left,        // width of the window
         wr.bottom - wr.top,        // height of the window
-        NULL,                      // we have no parent window, NULL
-        NULL,                      // we aren't using menus, NULL
+        nullptr,                      // we have no parent window, nullptr
+        nullptr,                      // we aren't using menus, nullptr
         hInstance,                 // application handle
-        NULL);                     // used with multiple windows, NULL
+        nullptr);                     // used with multiple windows, nullptr
 
     //Display the window on the screen
-    ShowWindow(hWnd, nCmdShow);
+    ShowWindow(hWnd, nShowCmd);
 
     //Sets up and initialize Direct3D
     InitD3D(hWnd);
 
+
     //Initialize game stuff (camera)
-    camera.SetLens(XM_PI/3, winWidth / (float)winHeight, 0.01f, 100.0f);
+    camera.SetLens(XM_PI/3, winWidth / static_cast<float>(winHeight), 0.01f, 100.0f);
     XMVECTOR eye = XMVectorSet(0.0f, 1.0f, -5.0f, 0.0f);
     XMVECTOR at = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
     XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
@@ -143,7 +150,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     while (true)
     {
         //Check to see if any messages are waiting in the queue
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
         {
 
             //Translate keystroke messages into the right format
@@ -164,7 +171,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
         //Subtract current time from previous time
         LARGE_INTEGER currTime = {};
         QueryPerformanceCounter(&currTime);
-        float deltaTime = (currTime.QuadPart - prevTime.QuadPart) / (float)frequency.QuadPart;
+        float deltaTime = (currTime.QuadPart - prevTime.QuadPart) / static_cast<float>(frequency.QuadPart);
         prevTime = currTime;
 
         //Update the frame with camera controls
@@ -192,7 +199,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine,
     CleanD3D();
 
     //Return this part of the WM_QUIT message to Windows
-    return (int) msg.wParam;
+    return static_cast<int>(msg.wParam);
 }
 
 
@@ -241,25 +248,34 @@ void InitD3D(HWND hWnd)
     swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;   //Use 32-bit color
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;    //How swap chain is to be used
     swapChainDesc.OutputWindow = hWnd;                              //The window to be used
-    swapChainDesc.SampleDesc.Count = 4;                             //How many multisamples
+    swapChainDesc.SampleDesc.Count = 1;                             //How many multisamples
     swapChainDesc.Windowed = true;                                  //Windowed/full-screen mode
 
     //Create a device, device context, and swap chain using the information in the swapChainDesc struct
-    D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, D3D11_CREATE_DEVICE_DEBUG, NULL, NULL, D3D11_SDK_VERSION,
-        &swapChainDesc, &swapChain, &device, NULL, &deviceContext);
+    D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_DEBUG, nullptr, 0, D3D11_SDK_VERSION,
+        &swapChainDesc, &swapChain, &device, nullptr, &deviceContext);
 
     //Get the address of the back buffer
+    auto lib = LoadLibraryW(L"dxgidebug.dll");
+    if (lib) {
+        auto pDXGIGetDebugInterface = reinterpret_cast<decltype(&DXGIGetDebugInterface)>(GetProcAddress(lib, "DXGIGetDebugInterface"));
+        pDXGIGetDebugInterface(IID_PPV_ARGS(&debug));
+    }
+    
     ID3D11Texture2D *pBackBuffer = {};
     swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
 
     //Use the back buffer address to create the render target
-    hr = device->CreateRenderTargetView(pBackBuffer, NULL, &backBuffer);
+    hr = device->CreateRenderTargetView(pBackBuffer, nullptr, &backBuffer);
     assert(SUCCEEDED(hr));
 
     pBackBuffer->Release();
 
+    //Create the depth buffer
+    CreateDepthBuffer();
+
     //Set the render target as the back buffer
-    deviceContext->OMSetRenderTargets(1, &backBuffer, NULL);
+    deviceContext->OMSetRenderTargets(1, &backBuffer, depthStencilView);
 
     //Set the viewport
     D3D11_VIEWPORT viewPort = {};
@@ -302,6 +318,7 @@ void RenderFrame()
 
     //Clear the back buffer to a deep blue
     deviceContext->ClearRenderTargetView(backBuffer, color);
+    deviceContext->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH, 1.0f, 0);
 
     //Select which vertex buffer to display
     UINT stride = sizeof(VERTEX);
@@ -325,7 +342,7 @@ void RenderFrame()
 
     //Render the light
     XMMATRIX light = XMMatrixTranslationFromVector(5.0f * XMLoadFloat4(&LightDir));
-    XMMATRIX lightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
+    const XMMATRIX lightScale = XMMatrixScaling(0.2f, 0.2f, 0.2f);
     light = lightScale * light;
 
     //Pass the shader resource view to the shader
@@ -369,11 +386,16 @@ void CleanD3D()
     ground.pTexture->Release();
     cube.pShaderView->Release();
     ground.pShaderView->Release();
+    depthStencilBuffer->Release();
+    depthStencilView->Release();
     pSamplerState->Release();
     swapChain->Release();
     backBuffer->Release();
     device->Release();
     deviceContext->Release();
+
+    debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+    debug->Release();
 
     delete[] targaData;
     targaData = 0;
@@ -391,14 +413,14 @@ Object SetupObject(VERTEX* vertices, UINT vertices_size, short *indices, UINT in
     vBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;        //Use as a vertex buffer
     vBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;     //Allow CPU to write in buffer
 
-    hr = device->CreateBuffer(&vBufferDesc, NULL, &object.pVBuffer);
+    hr = device->CreateBuffer(&vBufferDesc, nullptr, &object.pVBuffer);
     assert(SUCCEEDED(hr));
 
     //Copy the vertices into the buffer
     D3D11_MAPPED_SUBRESOURCE vMappedResource = {};
-    deviceContext->Map(object.pVBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &vMappedResource);    //map the buffer
+    deviceContext->Map(object.pVBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &vMappedResource);    //map the buffer
     memcpy(vMappedResource.pData, vertices, vertices_size);                        //copy the data
-    deviceContext->Unmap(object.pVBuffer, NULL);
+    deviceContext->Unmap(object.pVBuffer, 0);
 
     D3D11_BUFFER_DESC iBufferDesc = {};
     iBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
@@ -407,19 +429,19 @@ Object SetupObject(VERTEX* vertices, UINT vertices_size, short *indices, UINT in
     iBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     //Create index buffer
-    hr = device->CreateBuffer(&iBufferDesc, NULL, &object.pIBuffer);
+    hr = device->CreateBuffer(&iBufferDesc, nullptr, &object.pIBuffer);
     assert(SUCCEEDED(hr));
 
     //Copy the indices into the buffer
     D3D11_MAPPED_SUBRESOURCE iMappedResource = {};
-    deviceContext->Map(object.pIBuffer, NULL, D3D11_MAP_WRITE_DISCARD, NULL, &iMappedResource);    //Map the buffer
+    deviceContext->Map(object.pIBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &iMappedResource);    //Map the buffer
     memcpy(iMappedResource.pData, indices, indices_size);                                //Copy the data
-    deviceContext->Unmap(object.pIBuffer, NULL);
+    deviceContext->Unmap(object.pIBuffer, 0);
 
     int width = 0;
     int height = 0;
     //bool result = LoadTarga("assets/stone.tga", height, width);
-    bool result = LoadTarga(targa, height, width);
+    const bool result = LoadTarga(targa, height, width);
     assert(result == true);
 
     CD3D11_TEXTURE2D_DESC textureDesc(DXGI_FORMAT_R8G8B8A8_UNORM, width, height, 1, 1);
@@ -431,28 +453,45 @@ Object SetupObject(VERTEX* vertices, UINT vertices_size, short *indices, UINT in
     hr = device->CreateTexture2D(&textureDesc, &initialData, &object.pTexture);
     assert(SUCCEEDED(hr));
 
-    hr = device->CreateShaderResourceView(object.pTexture, NULL, &object.pShaderView);
-    assert(SUCCEEDED(hr));
-
-    D3D11_SAMPLER_DESC samplerDesc = {};
-    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-    samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-    samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-    samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-    samplerDesc.MinLOD = 0;
-    samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-
-    hr = device->CreateSamplerState(&samplerDesc, &pSamplerState);
+    hr = device->CreateShaderResourceView(object.pTexture, nullptr, &object.pShaderView);
     assert(SUCCEEDED(hr));
 
     return object;
 }
 
+
+void CreateDepthBuffer()
+{
+    HRESULT hr = S_OK;
+
+    D3D11_TEXTURE2D_DESC depthStencilDesc = {};
+
+    depthStencilDesc.Width = winWidth;
+    depthStencilDesc.Height = winHeight;
+    depthStencilDesc.MipLevels = 1;
+    depthStencilDesc.ArraySize = 1;
+    depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+    //No MSAA
+    depthStencilDesc.SampleDesc.Count = 1;
+    depthStencilDesc.SampleDesc.Quality = 0;
+
+    depthStencilDesc.Usage = D3D11_USAGE_DEFAULT;
+    depthStencilDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+    depthStencilDesc.CPUAccessFlags = 0;
+    depthStencilDesc.MiscFlags = 0;
+
+    hr = device->CreateTexture2D(&depthStencilDesc, nullptr, &depthStencilBuffer);
+    assert(SUCCEEDED(hr));
+
+    hr = device->CreateDepthStencilView(depthStencilBuffer, nullptr, &depthStencilView);
+    assert(SUCCEEDED(hr));
+
+}
+
 //Creates the shape to render
 void InitGraphics()
 {
-    HRESULT hr = S_OK;
     //Create a triangle using the VERTEX struct
     //VERTEX vertices[] =
     //{
@@ -550,7 +589,7 @@ void InitPipeline()
 
     if (pErrorBlob)
     {
-        OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+        OutputDebugStringA(static_cast<const char*>(pErrorBlob->GetBufferPointer()));
         pErrorBlob->Release();
         pErrorBlob->Release();
     }
@@ -561,16 +600,16 @@ void InitPipeline()
 
     if (pErrorBlob)
     {
-        OutputDebugStringA(reinterpret_cast<const char*>(pErrorBlob->GetBufferPointer()));
+        OutputDebugStringA(static_cast<const char*>(pErrorBlob->GetBufferPointer()));
         pErrorBlob->Release();
         pErrorBlob->Release();
     }
 
     //Encapsulate both shaders into the shader objects
-    hr = device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), NULL, &pVS);
+    hr = device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), nullptr, &pVS);
     assert(SUCCEEDED(hr));
 
-    hr = device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), NULL, &pPS);
+    hr = device->CreatePixelShader(PS->GetBufferPointer(), PS->GetBufferSize(), nullptr, &pPS);
     assert(SUCCEEDED(hr));
 
 
@@ -593,7 +632,7 @@ void InitPipeline()
     viewMatrix = XMMatrixLookAtLH(eye, at, up);
 
     //Initialize the projection matrix
-    projectionMatrix = XMMatrixPerspectiveFovLH(XM_PIDIV2, winWidth / (float)winHeight, 0.01f, 100.0f);
+    projectionMatrix = XMMatrixPerspectiveFovLH(XM_PIDIV2, winWidth / static_cast<float>(winHeight), 0.01f, 100.0f);
 
 
     //Set the shader objects
@@ -616,26 +655,38 @@ void InitPipeline()
     assert(SUCCEEDED(hr));
 
     deviceContext->IASetInputLayout(pLayout);
+
+    D3D11_SAMPLER_DESC samplerDesc = {};
+    samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+    samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    samplerDesc.MinLOD = 0;
+    samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+    hr = device->CreateSamplerState(&samplerDesc, &pSamplerState);
+    assert(SUCCEEDED(hr));
 }
 
 
 bool LoadTarga(const char* filename, int& height, int& width)
 {
     FILE* filePtr = nullptr;
-    unsigned int count = 0;
+    size_t count = 0;
     TargaHeader targaFileHeader = {};
     unsigned char* targaImage = nullptr;
 
 
     // Open the targa file for reading in binary.
     int error = fopen_s(&filePtr, filename, "rb");
-    if (error != 0)
+    if (error != 0 || filePtr == nullptr)
     {
         return false;
     }
 
     // Read in the file header.
-    count = (unsigned int)fread(&targaFileHeader, sizeof(TargaHeader), 1, filePtr);
+    count = fread(&targaFileHeader, sizeof(TargaHeader), 1, filePtr);
     if (count != 1)
     {
         return false;
@@ -644,7 +695,7 @@ bool LoadTarga(const char* filename, int& height, int& width)
     // Get the important information from the header.
     height = (int)targaFileHeader.height;
     width = (int)targaFileHeader.width;
-    int bpp = (int)targaFileHeader.bpp;
+    const int bpp = (int)targaFileHeader.bpp;
 
     // Check that it is 32 bit and not 24 bit.
     if (bpp != 32)
@@ -663,7 +714,7 @@ bool LoadTarga(const char* filename, int& height, int& width)
     }
 
     // Read in the targa image data.
-    count = (unsigned int)fread(targaImage, 1, imageSize, filePtr);
+    count = fread(targaImage, 1, imageSize, filePtr);
     if (count != imageSize)
     {
         return false;

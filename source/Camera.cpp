@@ -2,8 +2,7 @@
 
 const float PI = 3.1415926535f;
 
-Camera::Camera()
-    : mPosition(0.0f, 0.0f, 0.0f),
+Camera::Camera() : mPosition(0.0f, 0.0f, 0.0f),
     mRight(1.0f, 0.0f, 0.0f),
     mUp(0.0f, 1.0f, 0.0f),
     mLook(0.0f, 0.0f, 1.0f)
@@ -87,7 +86,7 @@ float Camera::GetFovY()const
 
 float Camera::GetFovX()const
 {
-    float halfWidth = 0.5f*GetNearWindowWidth();
+    const float halfWidth = 0.5f*GetNearWindowWidth();
     return 2.0f*atanf(halfWidth / mNearZ);
 }
 
@@ -122,7 +121,7 @@ void Camera::SetLens(float fovY, float aspect, float zn, float zf)
     mNearWindowHeight = 2.0f * mNearZ * tanf(0.5f * mFovY);
     mFarWindowHeight = 2.0f * mFarZ * tanf(0.5f * mFovY);
 
-    XMMATRIX P = XMMatrixPerspectiveFovLH(mFovY, mAspect, mNearZ, mFarZ);
+    const XMMATRIX P = XMMatrixPerspectiveFovLH(mFovY, mAspect, mNearZ, mFarZ);
     XMStoreFloat4x4(&mProj, P);
 }
 
@@ -184,7 +183,7 @@ void Camera::Pitch(float angle)
 {
     // Rotate up and look vector about the right vector.
 
-    XMMATRIX R = XMMatrixRotationAxis(XMLoadFloat3(&mRight), angle);
+    const XMMATRIX R = XMMatrixRotationAxis(XMLoadFloat3(&mRight), angle);
 
     XMStoreFloat3(&mUp, XMVector3TransformNormal(XMLoadFloat3(&mUp), R));
     XMStoreFloat3(&mLook, XMVector3TransformNormal(XMLoadFloat3(&mLook), R));
@@ -194,7 +193,7 @@ void Camera::RotateY(float angle)
 {
     // Rotate the basis vectors about the world y-axis.
 
-    XMMATRIX R = XMMatrixRotationY(angle);
+    const XMMATRIX R = XMMatrixRotationY(angle);
 
     XMStoreFloat3(&mRight, XMVector3TransformNormal(XMLoadFloat3(&mRight), R));
     XMStoreFloat3(&mUp, XMVector3TransformNormal(XMLoadFloat3(&mUp), R));
