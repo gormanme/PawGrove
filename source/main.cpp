@@ -4,6 +4,11 @@
 #include <d3dcompiler.h>
 #include <directxmath.h>
 #include <stdio.h>
+#include <vector>
+
+#include <assimp\Importer.hpp>
+#include <assimp\scene.h>
+#include <assimp\postprocess.h>
 
 #include "Camera.h"
 
@@ -18,6 +23,10 @@ struct Object {
     ID3D11Buffer *pIBuffer = nullptr;                //Pointer to index buffer
     ID3D11Texture2D *pTexture = nullptr;
     ID3D11ShaderResourceView *pShaderView = nullptr;
+    int vertex_count = 0;
+    int index_count = 0;
+    int vertex_size = 0;
+    int index_size = 0;
 };
 
 //Global declarations
@@ -37,6 +46,7 @@ unsigned char* targaData = nullptr;
 Camera camera;
 Object cube;
 Object ground;
+Object panda;
 ID3D11Texture2D *depthStencilBuffer = nullptr;
 ID3D11DepthStencilView *depthStencilView = nullptr;
 ID3D11DepthStencilState *depthStencilState = nullptr;
@@ -84,6 +94,7 @@ void InitGraphics();                //Creates the shape to render
 void InitPipeline();                //Loads and prepares the shaders
 bool LoadTarga(const char* filename, int& height, int& width);
 Object SetupObject(VERTEX* vertices, UINT vertices_size, short *indices, UINT indices_size, const char *targa);
+Object LoadModel(const char* filename);
 
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd)
@@ -356,15 +367,22 @@ void RenderFrame()
 
     //Draw the vertex buffer to the back buffer
     //Ground:
-    deviceContext->IASetVertexBuffers(0, 1, &ground.pVBuffer, &stride, &offset);
-    deviceContext->IASetIndexBuffer(ground.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
-    deviceContext->PSSetShaderResources(0, 1, &ground.pShaderView);
-    deviceContext->DrawIndexed(6, 0, 0);
+    //deviceContext->IASetVertexBuffers(0, 1, &ground.pVBuffer, &stride, &offset);
+    //deviceContext->IASetIndexBuffer(ground.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
+    //deviceContext->PSSetShaderResources(0, 1, &ground.pShaderView);
+    //deviceContext->DrawIndexed(ground.index_count, 0, 0);
+
+    //Panda:
+    deviceContext->IASetVertexBuffers(0, 1, &panda.pVBuffer, &stride, &offset);
+    deviceContext->IASetIndexBuffer(panda.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
+    deviceContext->PSSetShaderResources(0, 1, &panda.pShaderView);
+    deviceContext->DrawIndexed(panda.index_count, 0, 0);
+
     //Cube:
-    deviceContext->IASetVertexBuffers(0, 1, &cube.pVBuffer, &stride, &offset);
+    /*deviceContext->IASetVertexBuffers(0, 1, &cube.pVBuffer, &stride, &offset);
     deviceContext->IASetIndexBuffer(cube.pIBuffer, DXGI_FORMAT_R16_UINT, 0);
     deviceContext->PSSetShaderResources(0, 1, &cube.pShaderView);
-    deviceContext->DrawIndexed(36, 0, 0);
+    deviceContext->DrawIndexed(cube.index_count, 0, 0);*/
 
 
 
@@ -460,7 +478,85 @@ Object SetupObject(VERTEX* vertices, UINT vertices_size, short *indices, UINT in
     hr = device->CreateShaderResourceView(object.pTexture, nullptr, &object.pShaderView);
     assert(SUCCEEDED(hr));
 
+    object.vertex_count = vertices_size / sizeof(vertices[0]);
+    object.vertex_size = sizeof(vertices[0]);
+    object.index_count = indices_size / sizeof(indices[0]);
+    object.index_size = sizeof(indices[0]);
+
     return object;
+}
+
+Object LoadModel(const char * filename)
+{
+    
+    // Create importer
+    Assimp::Importer importer;
+    importer.SetPropertyBool(AI_CONFIG_PP_PTV_NORMALIZE, true);
+    importer.SetPropertyInteger(AI_CONFIG_PP_SBP_REMOVE,
+        aiPrimitiveType_LINE |
+        aiPrimitiveType_POINT);
+    importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS,
+        aiComponent_COLORS |
+        aiComponent_LIGHTS |
+        aiComponent_CAMERAS |
+        aiComponent_BONEWEIGHTS);
+    // Load scene
+    auto const* scene = importer.ReadFile(filename,
+        aiProcess_CalcTangentSpace |
+        aiProcess_Triangulate |
+        aiProcess_JoinIdenticalVertices |
+        aiProcess_TransformUVCoords |
+        aiProcess_GenUVCoords |
+        aiProcess_ValidateDataStructure |
+        aiProcess_GenSmoothNormals |
+        aiProcess_RemoveRedundantMaterials |
+        aiProcess_OptimizeMeshes |
+        aiProcess_FindDegenerates |
+        aiProcess_FindInvalidData |
+        aiProcess_FindInstances |
+        aiProcess_SortByPType);
+    
+    assert(scene != NULL);
+    assert(scene->mNumMeshes > 0);
+
+    //Find number of vertices and indices
+    auto const* const mesh = scene->mMeshes[0];
+    uint32_t vertex_count = mesh->mNumVertices;
+    uint32_t index_count = mesh->mNumFaces * 3;
+    
+    size_t const vertex_size = sizeof(VERTEX);
+    size_t const index_size = sizeof(uint32_t);
+    // For each model
+    //  for each mesh
+    //      get verices
+    //      get indices
+
+    std::vector<VERTEX> vertices = {};
+    std::vector<short> indices = {};
+
+    for (uint32_t i = 0; i < vertex_count; i++) {
+        aiVector3D const& pos = mesh->mVertices[i];
+        aiVector3D const& tex = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : aiVector3D(0.0f);
+        aiVector3D const& normal = mesh->mNormals[i];
+
+        VERTEX vertex = {
+            {pos.x, pos.y, pos.z },
+            {normal.x, normal.y, normal.z},
+            {tex.x, tex.y}
+        };
+
+        vertices.push_back(vertex);
+    }
+
+    for (uint32_t i = 0; i < mesh->mNumFaces; i++) {
+        aiFace const& face = mesh->mFaces[i];
+        //for (int j = 2; j >=0; --j) {
+            for (int j = 0; j < 3; j++) {
+            indices.push_back((uint16_t)face.mIndices[j]);
+        }
+    }
+
+    return SetupObject(vertices.data(), static_cast<UINT>(vertices.size() * sizeof(vertices[0])), indices.data(), static_cast<UINT>(indices.size() * sizeof(indices[0])), "assets/pandaren_model/pandaren_Body.tga");
 }
 
 
@@ -581,7 +677,7 @@ void InitGraphics()
 
     cube = SetupObject(cubeVertices, sizeof(cubeVertices), cubeIndices, sizeof(cubeIndices), "assets/stone.tga");
     ground = SetupObject(groundVertices, sizeof(groundVertices), groundIndices, sizeof(groundIndices), "assets/stone.tga");
-
+    panda = LoadModel("assets/pandaren_model/pandaren.obj");
 }
 
 
