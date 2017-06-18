@@ -520,9 +520,15 @@ Object LoadModel(const char * filename)
     assert(scene->mNumMeshes > 0);
 
     //Find number of vertices and indices
-    auto const* const mesh = scene->mMeshes[0];
-    uint32_t vertex_count = mesh->mNumVertices;
-    uint32_t index_count = mesh->mNumFaces * 3;
+    uint32_t vertex_count = 0;
+    uint32_t index_count = 0;
+
+    for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
+        auto const* const mesh = scene->mMeshes[m];
+        vertex_count += mesh->mNumVertices;
+        index_count += mesh->mNumFaces * 3;
+    }
+
     
     size_t const vertex_size = sizeof(VERTEX);
     size_t const index_size = sizeof(uint32_t);
@@ -534,27 +540,35 @@ Object LoadModel(const char * filename)
     std::vector<VERTEX> vertices = {};
     std::vector<short> indices = {};
 
-    for (uint32_t i = 0; i < vertex_count; i++) {
-        aiVector3D const& pos = mesh->mVertices[i];
-        aiVector3D const& tex = mesh->HasTextureCoords(0) ? mesh->mTextureCoords[0][i] : aiVector3D(0.0f);
-        aiVector3D const& normal = mesh->mNormals[i];
+    for (uint32_t m = 0; m < scene->mNumMeshes; m++) {
+        auto const* curr_mesh = scene->mMeshes[m];
 
-        VERTEX vertex = {
-            {pos.x, pos.y, pos.z },
-            {normal.x, normal.y, normal.z},
-            {tex.x, tex.y}
-        };
+        size_t vertex_start_offset = vertices.size();
 
-        vertices.push_back(vertex);
-    }
+        for (uint32_t i = 0; i < curr_mesh->mNumVertices; i++) {
+            aiVector3D const& pos = curr_mesh->mVertices[i];
+            aiVector3D const& tex = curr_mesh->HasTextureCoords(0) ? curr_mesh->mTextureCoords[0][i] : aiVector3D(0.0f);
+            aiVector3D const& normal = curr_mesh->mNormals[i];
 
-    for (uint32_t i = 0; i < mesh->mNumFaces; i++) {
-        aiFace const& face = mesh->mFaces[i];
-        //for (int j = 2; j >=0; --j) {
+            VERTEX vertex = {
+                { pos.x, pos.y, pos.z },
+                { normal.x, normal.y, normal.z },
+                { tex.x, tex.y }
+            };
+
+            vertices.push_back(vertex);
+        }
+
+        for (uint32_t i = 0; i < curr_mesh->mNumFaces; i++) {
+            aiFace const& face = curr_mesh->mFaces[i];
+            //for (int j = 2; j >=0; --j) {
             for (int j = 0; j < 3; j++) {
-            indices.push_back((uint16_t)face.mIndices[j]);
+                indices.push_back((uint16_t)face.mIndices[j] + (uint16_t)vertex_start_offset);
+            }
         }
     }
+
+
 
     return SetupObject(vertices.data(), static_cast<UINT>(vertices.size() * sizeof(vertices[0])), indices.data(), static_cast<UINT>(indices.size() * sizeof(indices[0])), "assets/pandaren_model/pandaren_Body.tga");
 }
@@ -692,25 +706,24 @@ void InitPipeline()
     ID3DBlob *pErrorBlob = nullptr;
     hr = D3DCompileFromFile(L"source/shader.hlsl", nullptr, nullptr, "VShader", "vs_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
         &VS, &pErrorBlob);
-    assert(SUCCEEDED(hr));
+
 
     if (pErrorBlob)
     {
         OutputDebugStringA(static_cast<const char*>(pErrorBlob->GetBufferPointer()));
         pErrorBlob->Release();
-        pErrorBlob->Release();
     }
+    assert(SUCCEEDED(hr));
 
     hr = D3DCompileFromFile(L"source/shader.hlsl", nullptr, nullptr, "PShader", "ps_5_0", D3D10_SHADER_ENABLE_STRICTNESS, 0,
         &PS, &pErrorBlob);
-    assert(SUCCEEDED(hr));
 
     if (pErrorBlob)
     {
         OutputDebugStringA(static_cast<const char*>(pErrorBlob->GetBufferPointer()));
         pErrorBlob->Release();
-        pErrorBlob->Release();
     }
+    assert(SUCCEEDED(hr));
 
     //Encapsulate both shaders into the shader objects
     hr = device->CreateVertexShader(VS->GetBufferPointer(), VS->GetBufferSize(), nullptr, &pVS);
