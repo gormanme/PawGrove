@@ -502,6 +502,7 @@ Object LoadModel(const char * filename)
         aiComponent_BONEWEIGHTS);
     // Load scene
     auto const* scene = importer.ReadFile(filename,
+        aiProcess_ConvertToLeftHanded |
         aiProcess_CalcTangentSpace |
         aiProcess_Triangulate |
         aiProcess_JoinIdenticalVertices |
